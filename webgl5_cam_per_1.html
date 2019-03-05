@@ -187,12 +187,24 @@ function setupBuffers() {
 
 
 
-function redraw() { 
+function redraw() {
+	var cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
+	var cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
+
 	var localAngle = parseFloat(document.getElementById("angleText").value); 
 	totalAngle = totalAngle + localAngle*Math.PI/180.0;
 	
 	var localZ = parseFloat(document.getElementById("heightText").value); 
 	totalZ += localZ;
+	
+	var selectPos = document.querySelector('input[name="position"]:checked').value;
+	var tokens = selectPos.split("-");
+	
+	var fx = fy = fz = 1;
+	
+	if(tokens[0] == "Left")  fx = -1;
+	if(tokens[1] == "Bottom")  fy = -1;
+	if(tokens[2] == "Back")	fz = -1;
 	
 	// Αποφυγή overflow για το totalAngle
 	/*if (totalAngle >= 2*Math.PI) // Αν η συνολική γωνία μόλις έγινε (σε ακτίνια) μεγαλύτερη από 360 μοίρες (2π) 
@@ -237,10 +249,10 @@ function redraw() {
 	var c = Math.cos(totalAngle);
 	var s = Math.sin(totalAngle);
 	
-	mat4.lookAt(vMatrix,[2,2,2],[0,0,0],[0,1,0]);
+	mat4.lookAt(vMatrix,[fx*cameraDistance,fy*cameraDistance,fz*cameraDistance],[0,0,0],[0,1,0]);
 
 	var pMatrix = mat4.create();
-	mat4.perspective(pMatrix,Math.PI/2,1,0.01,10);
+	mat4.perspective(pMatrix,Math.PI/4,1,0.01,10);
 
 	mat4.multiply(pvMatrix,pMatrix,vMatrix);
 
@@ -321,6 +333,22 @@ Rotate by:<input type="text" id="angleText" value="1">
 <button onClick=stopAnim()>Stop</button>
 Raise camera by:<input type="text" id="heightText" value="0.01">
 </p>
+
+camera view (degrees):<input type="text" id="cameraView" value="90">
+<br>
+camera distance:<input type="text" id="cameraDistance" value="2">
+<br><br>
+<div id="radioButtons">
+	<input type="radio" name="position" value="Left-Bottom-Back">Left Bottom Back<br>
+	<input type="radio" name="position" value="Left-Bottom-Front">Left Bottom Front<br>
+	<input type="radio" name="position" value="Left-Top-Back">Left Top Back<br>
+	<input type="radio" name="position" value="Left-Top-Front">Left Top Front<br>
+	<input type="radio" name="position" value="Right-Bottom-Back">Right Bottom Back<br>
+	<input type="radio" name="position" value="Right-Bottom-Front">Right Bottom Front<br>
+	<input type="radio" name="position" value="Right-Top-Back">Right Top Back<br>
+	<input type="radio" name="position" value="Right-Top-Front" checked="checked">Right Top Front<br>
+</div>
+<button onClick="redraw()">Redraw scene</button>
 <!-- ΒΗΜΑ.5. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΕΝΑ ΤΕΧΤ ΒΟΧ ΓΙΑ ΤΟ ΒΗΜΑ ΤΟΥ ΥΨΟΥΣ ΤΗΣ ΚΑΜΕΡΑΣ (ΠΡΟΤΕΙΝΟΜΕΝΟ VALUE 0.01)--->
 </body>
 </html>
