@@ -1,0 +1,283 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+
+<script src="webgl-debug.js">// ΝΕΟ.1: Βιβλιοθήκη για αναφορά λαθών WebGL. Δες ΝΕΟ.13 στη startup()</script>
+<script src="gl-matrix-min.js">// ΝΕΟ.2: Βιβλιοθήκη διαχείρισης πινάκων</script>
+
+<script id="vShader" type="x-shader/x-vertex">
+// Ο παρακάτω κώδικας δεν είναι Javascript αλλά GLSL (GL Shader Language)
+	attribute vec4 aVertexPosition; // attribute: παράμετρος εισόδου του shader
+	attribute vec4 aVertexColor;
+	
+	uniform mat4 uTransformMatrix; // ΝΕΟ.3: μια "σταθερά" (=δηλ. ίδια τιμή για όλα τα vertices) που θα παραλάβει τον πίνακα του μετασχηματισμού 
+	
+	varying vec4 vColor; // varying: μεταβλητή εξόδου προς το fragment shader
+	
+	void main() {
+		gl_Position = uTransformMatrix * aVertexPosition; // ΝΕΟ.4: Εφαρμογή του μετασχηματισμού περιστροφής με πολλαπλασιασμό πινάκων						
+		vColor = aVertexColor;  // Χρώμα κάθε κορυφής (vertex) 
+	} 
+</script>
+
+<script id="fShader" type="x-shader/x-fragment">
+// Ο παρακάτω κώδικας δεν είναι Javascript αλλά GLSL (GL Shader Language) 
+	precision mediump float; // Ορίζεται η ακρίβεια των πραγματικών που θα χρησιμοποιηθούν
+	varying vec4 vColor; // varying: Παράμετρος εισόδου από το vertex shader
+	void main() {
+		gl_FragColor = vColor;
+	}
+</script>
+
+<script>
+
+var gl; // Το rendering context που ***ΜΑΣ ΔΙΝΕΙ ΠΡΟΣΒΑΣΗ ΣΤΟ WebGL API*** μέσω των μεθόδων του και των ιδιοτήτων του
+var canvas; // Το DOM αντικείμενο που θα φιλοξενήσει το context
+var shaderProgram; // O κώδικας των vertex και fragment shaders
+var vertexPositionAttributePointer; // Η διεύθυνση του attribute aVertexPosition
+var vertexColorAttributePointer; // Η διεύθυνση του attribute aVertexColor
+var vertexBuffer; // Η μεταβλητή στην οποία θα αποθηκευτούν προσωρινά οι συντεταγμένες των vertices 
+var colorBuffer; // Η μεταβλητή στην οποία θα αποθηκευτούν προσωρινά τα χρώματα των vertices 
+
+var transformUniformPointer; // ΝΕΟ.5: Η διεύθυνση του uniform uTransformMatrix
+var totalAngle=0; // ΝΕΟ.6: η μεταβλητή που θα θυμάται τη συνολική γωνία περιστροφής
+
+var requestId=0; // ΝΕΟΤΕΡΟ.0: η μεταβλητή που θα θυμάται το τελευταίο αίτημα για animation frame
+
+function createGLContext(canvas) {
+	var context = null;
+
+	context = canvas.getContext("webgl");  // 4.1 Δημιούργησε ένα WebGL context 
+	if (!context)
+		context = canvas.getContext("experimental-webgl"); // 4.1 Αν δεν πέτυχε προσπάθησε ξανά με το παλαιότερο όνομα
+	if (context) {
+		context.viewportWidth = canvas.width; // 4.2 Αν πέτυχε (με την πρώτη ή με τη δεύτερη) δώσε διαστάσεις στο 
+		context.viewportHeight = canvas.height; // viewport του context ("πεδίο παράστασης" μτφ.Θεοχάρη)
+	} 
+	else {
+		alert("Failed to create WebGL context!");
+	}
+	return context;
+}
+
+function loadShader(type, shaderSource) {
+	var shader = gl.createShader(type); // 5.3.1 και 5.4.1 Δημιούργησε έναν κενό shader του τύπου που δόθηκε σαν παράμετρος 
+	gl.shaderSource(shader, shaderSource); // 5.3.2 και 5.4.2 Ενημέρωσε το shader με τον κώδικά του (σε μορφή string)
+	gl.compileShader(shader); // 5.3.3 και 5.4.3 Κάνε compile τον κώδικα του shader
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { // Αν δεν γίνει compile με επιτυχία 
+		alert("Error compiling shader" + gl.getShaderInfoLog(shader)); // Δώσε μήνυμα με πληροφορίες για το shader
+		gl.deleteShader(shader);  // και κατάστρεψέ τον
+		return null;
+	}
+	return shader;  // 5.3.4 και 5.3.5 επίστρεψε τον compiled shader αν όλα πήγαν καλά (αλλιώς έχει επιστρέψει null παραπάνω)
+}
+
+function setupShaders() {
+	var vertexShaderSource = document.getElementById("vShader").textContent; 
+	// 5.1 Δημιούργησε string με τον κώδικα του vertex shader από το κείμενο του αντίστοιχου script
+
+	var fragmentShaderSource = document.getElementById("fShader").textContent; 
+	// 5.2 Δημιούργησε string με τον κώδικα του fragment shader από το κείμενο του αντίστοιχου script
+
+	var vertexShader = loadShader(gl.VERTEX_SHADER, vertexShaderSource); // CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: 
+	// 5.3 Δημιούργησε και ενημέρωσε το αντικείμενο vertex shader
+
+	var fragmentShader = loadShader(gl.FRAGMENT_SHADER, fragmentShaderSource); // CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: 
+	// 5.4 ομοίως το fragment shader
+
+	shaderProgram = gl.createProgram(); // 5.5 Δημιούργησε ένα (κενό) πρόγραμμα(=αντικείμενο) (που πρόκειται να περιέχει τους shaders)
+	gl.attachShader(shaderProgram, vertexShader); // 5.6 πρόσθεσε το vertex shader στο συγκεκριμένο πρόγραμμα 
+	gl.attachShader(shaderProgram, fragmentShader); // 5.7 πρόσθεσε το fragment shader
+	gl.linkProgram(shaderProgram); // 5.8 δημιούργησε το αντίστοιχο εκτελέσιμο (και των δύο shaders)
+
+	if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) { // 5.9 Αν υπήρξε λάθος στη δημιουργία του εκτελέσιμο πες το
+		alert("Failed to setup shaders");
+	}
+
+	gl.useProgram(shaderProgram); // 5.10 Επισύναψε το εκτελέσιμο στο context 
+
+	vertexPositionAttributePointer = gl.getAttribLocation(shaderProgram, "aVertexPosition"); 
+	// 5.11 Βρες και αποθήκευσε στην αντίστοιχη μεταβλητή, τη διεύθυνση του attribute του shader program, το οποίο έχει όνομα το string που δόθηκε σα δεύτερη παράμετρος
+	gl.enableVertexAttribArray(vertexPositionAttributePointer); // 5.12 Προετοίμασε το attribute (μέσω του pointer που δείχνει σε αυτό) να δεχθεί δεδομένα
+	
+	vertexColorAttributePointer = gl.getAttribLocation(shaderProgram,"aVertexColor"); // Ομοίως (5.11, 5.12) για το attribute του χρώματος
+	gl.enableVertexAttribArray(vertexColorAttributePointer);
+	
+	transformUniformPointer = gl.getUniformLocation(shaderProgram, "uTransformMatrix"); // ΝΕΟ.7: Βρες και αποθήκευσε στην αντίστοιχη μεταβλητή, τη διεύθυνση του 
+	// uniform στο shader program το οποίο έχει όνομα το string που δόθηκε σα δεύτερη παράμετρος
+	// ΔΕ ΧΡΕΙΑΖΕΤΑΙ ΑΝΤΙΣΤΟΙΧΗ enable (δηλ. αντίστοιχη της 5.12) ΓΙΑ ΤΑ uniforms
+}
+
+function setupBuffers() {
+	vertexBuffer = gl.createBuffer(); // 6.1 Δημιούργησε (δέσμευσε) έναν buffer για τις κορυφές
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); // 6.2 Ενεργοποίησέ τον, δηλ. φέρε τον στο προσκήνιο: ό,τι δουλειά γίνεται με buffer θα αφορά αυτόν
+	var triangleVertices = [
+							0.5,0.5, 0, 1,     //v0
+							0.5, -0.5, 0, 1,   //v3
+							-0.5, -0.5, 0, 1,  //v2
+							-0.5, -0.5, 0, 1,  //v2
+							0.5,0.5,0,1,       //v0
+							-0.5,0.5,0,1,      //v1
+							-0.5,0.5,0,1,       //v1
+							-1.4,0.5,0,1,       //v4
+							-1.4,0.8,0,1,      //v5
+							-1.4,0.8,0,1,      //v5
+							-0.5,0.5,0,1,      //v1
+							1.4,0.8,0,1,       //v6
+							1.4,0.8,0,1,       //v6
+							1.4,0.5,0,1,       //v7
+							-0.5,0.5,0,1      //v1
+							];
+	// 6.3 Δημιούργησε έναν πίνακα στη μνήμη με τις συντεταγμένες (x,y,z,w) κάθε κορυφής. Ο πίνακας είναι μονοδιάστατος
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices),	gl.STATIC_DRAW); // 6.4 Τάισε τα δεδομένα του πίνακα στον (ενεργοποιημένο) buffer (επίσης μονοδιάστατος)
+	vertexBuffer.itemSize = 4; // 6.5 Δώσε τιμή στην ιδιότητα του buffer που καθορίζει ανά πόσες τιμές αφορούν την ίδια κορυφή 
+	vertexBuffer.numberOfItems = 15; // 6.6 Δώσε τιμή στην ιδιότητα του buffer που καθορίζει πόσες κορυφές αφορά ο buffer συνολικά
+	
+	colorBuffer = gl.createBuffer(); // Ομοίως (εντολές 6.1-6.6) για τον buffer των χρωμάτων και ένα σχετικό πίνακα 
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer); 
+	var colorVertices = [
+							0, 1, 0, 1,
+							1, 0, 0, 1,
+							0, 0, 1, 1,
+							1, 1, 0, 1,
+							0, 0, 1, 1,
+							1, 1, 0, 1,
+							0, 1, 0, 1,
+							1, 0, 0, 1,
+							0, 0, 1, 1,
+							1, 1, 0, 1,
+							0, 0, 1, 1,
+							1, 1, 0, 1,
+							0, 1, 0, 1,
+							1, 0, 0, 1,
+							0, 0, 1, 1
+							];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVertices),	gl.STATIC_DRAW); 
+	colorBuffer.itemSize = 4; 
+	colorBuffer.numberOfItems = 15; 
+	
+	var rotationMatrix = mat4.create(); // ΝΕΟ.8: Δημιούργησε ένα αντικείμενο που είναι 4x4 πίνακας και περιέχει το μοναδιαίο πίνακα
+	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(rotationMatrix)); // ΝΕΟ.9: Τάισε τον πίνακα στο αντίστοιχο uniform
+	// Σε αντίθεση με τα attributes, δε χρειάζεται να μεσολαβήσει buffer για να μεταφερθεί η πληροφορία από τον πίνακα στο uniform
+}
+
+function draw() { 
+	gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight); // 8.1 Ενεργοποίησε το viewport με τις διαστάσεις που δίνονται σαν παράμετροι
+	gl.clear(gl.COLOR_BUFFER_BIT); // 8.2 "Καθάρισε" το viewport χρωματίζοντάς το με το χρώμα που έχει οριστεί στο βήμα 7.
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); // 8.3 Κάνε ενεργό το vertex buffer
+	gl.vertexAttribPointer(vertexPositionAttributePointer, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	// 8.4 Παίρνε στοιχεία από τον ενεργό buffer και "τάιζέ" τα στη διεύθυνση του attribute (1η παράμετρος), 
+	// με μέγεθος στοιχείου σε πλήθος αριθμών (2η παρ.), 
+	// τύπο δεδομένων (3η), κανονικοποιώντας (4η παρ.) με βήμα τόσα bytes (5η παρ.) και ξεκινώντας από αυτό το byte (6η παράμετρος..)
+	
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer); // Ομοίως (8.3, 8.4) για τον buffer και το attribute του χρώματος
+	gl.vertexAttribPointer(vertexColorAttributePointer, colorBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexBuffer.numberOfItems); 
+	// 8.5 Σχεδίασε μια ακολουθία τριγώνων (1η παρ.) ξεκινώντας από την κορυφή με σειρά όση η 2η παρ., και σχεδίασε τόσες κορυφές όσες η 3η παρ. 
+}
+
+function startup() {
+	canvas = document.getElementById("myGLCanvas"); // 1. Απομόνωσε ("ψάρεψε") τον καμβά (έχει δημιουργηθεί ως HTML αντικείμενο)
+	var minDimPerc = 0.85*Math.min(window.innerWidth, window.innerHeight); // ΝΕΟ.10: Βρες την ελάχιστη διάσταση του παραθύρου και υπολόγισε ένα ποσοστό της, π.χ. 85%
+	canvas.width = minDimPerc; // ΝΕΟ.11: Όρισε τις διαστάσεις του καμβά ως το παραπάνω ποσοστό της ελάχιστης διάστασής του 
+	canvas.height = minDimPerc; // ΝΕΟ.12: Όρισε τις διαστάσεις του καμβά ως το παραπάνω ποσοστό της ελάχιστης διάστασής του
+	gl = createGLContext(canvas); // 4. CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: Δημιούργησε μέσα στον καμβά ένα WebGL rendering context
+	gl = WebGLDebugUtils.makeDebugContext(gl); 
+	// ΝΕΟ.13: Κλήση της μεθόδου βιβλιοθήκης που παραλαμβάνει το αυθεντικό rendering context 
+	// σαν παράμετρο και μας επιστρέφει ένα rendering context με αναφορά λαθών   
+															
+	setupShaders(); // 5. CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: Προετοίμασε τους shaders
+	setupBuffers(); // 6. CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: Προετοίμασε τους buffers
+	gl.clearColor(0.5, 0.5, 0.5, 1.0); // 7. Όρισε το χρώμα του background στο WebGL context (R,G,B,A) με τιμές από 0 ως 1
+
+	gl.frontFace(gl.CW);  // ΝΕΟΤΕΡΟ.1 "Εμπρός" όψη να θεωρείται η αριστερόστροφη (counter-clockwise CCW)
+	gl.enable(gl.CULL_FACE); // ΝΕΟΤΕΡΟ.2 Ενεργοποίησε την απόκρυψη της "κρυφής όψης" (CULL FACE)
+	gl.cullFace(gl.BACK); // ΝΕΟΤΕΡΟ.3 Κάνε "κρυφή" την "πίσω" όψη 	
+
+	draw(); // 8. CUSTOM ΣΥΝΑΡΤΗΣΗ - ΔΕΣ ΠΑΡΑΠΑΝΩ: Σχεδίασε
+}
+
+// ΝΕΟ.12: H redraw καλείται όποτε πατιέται το κουμπί του interface και λαμβάνει υπόψη τη γωνία-βήμα που έχει δώσει ο χρήστης για περιστροφή
+function redraw() {
+	var txtStepAngle = document.getElementById("stepAngle").value; // ΝΕΟ.13: Πάρε από το textbox τη γωνία-βήμα που έδωσε ο χρήστης (text)
+	var numStepAngle = parseFloat(txtStepAngle);  // ΝΕΟ.14: Μετάτρεψέ τη σε αριθμό (υποθέτουμε ότι ο χρήστης δίνει μοίρες)
+	numStepAngle = numStepAngle*Math.PI/180.0; // ΝΕΟ.15: Μετάτρεψε τις μοίρες σε ακτίνια
+	totalAngle += numStepAngle; // ΝΕΟ.16: Υπολόγισε τη συνολική γωνία
+	
+	var rotationMatrix = mat4.create(); // ΝΕΟ.17 (ίδια με ΝΕΟ.6): Δημιούργησε ένα αντικείμενο που είναι 4x4 πίνακας και περιέχει το μοναδιαίο πίνακα
+	mat4.fromXRotation(rotationMatrix, totalAngle); // ΝΕΟ.18: Ενημέρωσε τον πίνακα ώστε να αντιπροσωπεύει περιστροφή ως προς x'x κατά γωνία totalAngle
+	
+	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(rotationMatrix)); // ΝΕΟ.19  (ίδια με ΝΕΟ.7): Tάισε τον πίνακα στο αντίστοιχο uniform
+		
+	gl.clear(gl.COLOR_BUFFER_BIT); // ΝΕΟ.20 (ίδια με 8.2): Καθάρισε την προηγούμενη εικόνα
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, vertexBuffer.numberOfItems); // ΝΕΟ.21 (ίδια με 8.5): Σχεδίασε με τις τρέχουσες τιμές για attributes, uniforms
+}
+
+// ΝΕΟΤΕΡΟ.4
+function startAnim() {
+	if (!requestId)
+		anim();
+}
+
+// ΝΕΟΤΕΡΟ.5
+function anim() {
+	redraw();
+	requestId = window.requestAnimationFrame(anim);	
+}
+
+// ΝΕΟΤΕΡΟ.6
+function stopAnim() {
+	window.cancelAnimationFrame(requestId);
+	requestId = 0;
+}
+</script>
+
+</head>
+
+<body onload="startup()">
+<canvas id="myGLCanvas" >
+</canvas>
+<p>
+Rotate by:<input type="text" id="stepAngle" value="10">
+<button onClick=startAnim()>Start</button>
+<button onClick=stopAnim()>Stop</button>
+</p>
+</p>
+</body>
+</html>
+<!--
+Βήμα.-1. (read-only) Παρατηρείστε ότι (για λόγους που θα φανούν στη συνέχεια) η περιστροφή αυτή τη φορά είναι γύρω από τον άξονα xx'. 
+		Δημιουργήθηκε στην εντολή ΝΕΟ.18 πίνακας περιστροφής γύρω από τον άξονα xx'.
+
+Βήμα.0. (read-only) Παρατηρείστε το μηχανισμό του animation. Το κουμπί start καλεί τη startAnim (ΝΕΟΤΕΡΟ.4). Αυτή, αν το requestId είναι null
+    (το requestId είναι global μεταβλητή - ΝΕΟΤΕΡΟ.0), 
+	καλεί την anim() (ΝΕΟΤΕΡΟ.5). Αν το requestId έχει τιμή διαφορετική από 0 δεν καλείται η anim() - αυτό γίνεται για να υπάρχει μόνο μία ακολουθία requests). 
+	Η anim αρχικά καλεί τη redraw που σχεδιάζει μια νέα εκδοχή της σκηνής. Στη συνέχεια, υποβάλλει αίτημα για animation frame, 
+	λαμβάνει requestId και εντάσσεται σε ουρά (callback list) μία επόμενη κλήση της. Όταν έρχεται η ώρα εκτέλεσης της κλήσης 
+	που είναι στην ουρά, εκτελείται η redraw και μία νέα κλήση μπαίνει στην ουρά κ.ο.κ. 
+	Αξίζει να παρατηρήσετε ότι Η ΠΡΩΤΗ ΕΚΤΕΛΕΣΗ ΤΗΣ redraw ΔΕ ΓΙΝΕΤΑΙ ΜΕΣΩ ΤΗΣ ΟΥΡΑΣ ΑΛΛΑ ΜΕΣΩ ΤΗΣ ΑΠΕΥΘΕΙΑΣ ΚΛΗΣΗΣ της anim ΑΠΟ ΤΗ startAnim.
+	Το animation σταματά μέσω της stopAnim (ΝΕΟΤΕΡΟ.6) με αίτημα ακύρωσης της επανεκτέλεσης της anim μέσω του (τελευταίου) requestId 
+	που είχε λάβει, και το requestId τίθεται 0 ώστε να μπορεί να ξαναρχίσει. 
+
+Βήμα.1. Εκτελέστε τον κώδικα ως έχει και μετά αφαιρέστε τα σχόλια στις ΝΕΟΤΕΡΟ.1, ΝΕΟΤΕΡΟ.2, ΝΕΟΤΕΡΟ.3 
+		ώστε να ενεργοποιηθούν οι εντολές στο τέλος της startup. 
+        Τι παρατηρείτε; 
+		Συμβουλευτείτε το οπτικό βοήθημα και διορθώστε τις συντεταγμένες του τριγώνου ώστε ΑΡΧΙΚΑ αυτό να είναι ορατό.
+
+Bήμα.2. (read-only) Η πρώτη παράμετρος της gl.drawArrays είναι gl.TRIANGLE_STRIP - εντολές 8.5 και ΝΕΟ.21. 
+        Δείτε στο οπτικό βοήθημα με ποιο τρόπο λαμβάνεται υπόψη η σειρά των κορυφών, των οποίων τις συντεταγμένες 
+		έχουμε δώσει μέσα στον πίνακα στη setupBuffers. 
+   
+Βήμα.3. Λαμβάνοντας υπόψη το Βήμα.2. μετατρέψτε το τρίγωνο σε τετράγωνο πλευράς 1 που οι κορυφές του βρίσκονται στα (+/- 0.5, +/- 0.5). 
+	    Φροντίστε να είναι ΑΡΧΙΚΑ να είναι ορατό, παρόμοια με το Βήμα.1. Οι αλλαγές που χρειάζονται να γίνουν είναι όλες στη setupBuffers. 
+	
+Βήμα.4. Προσθέστε ένα ορθογώνιο σε όποια πλευρά του τετραγώνου σας εξυπηρετεί (δείτε τον πίνακα στο εργαστήριο...) ώστε να σχηματίσει ένα ταυ. 
+        Το ορθογώνιο έχει μικρή διάσταση 0.3 και μεγάλη διάσταση 1.4
+	    Οι αλλαγές που χρειάζονται να γίνουν είναι όλες στη setupBuffers.
+
+Βήμα.5. Προσθέστε τρία textboxes όπου ο χρήστης θα δίνει ένα χρώμα μέσω 3 αριθμών (R,G,B). 
+	    Χρησιμοποιείστε την τριάδα για να δώσετε (ίδιο) χρώμα σε όλες τις κορυφές του ταυ.
+-->

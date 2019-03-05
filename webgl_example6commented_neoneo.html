@@ -1,0 +1,484 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="webgl-debug.js"></script>
+<script src="gl-matrix-min.js"></script>
+
+
+<script id="vShader" type="x-shader/x-vertex">
+	attribute vec4 aVertexPosition; 
+
+//	ΕΤΟΙΜΟ.1. Αντί για το attribute του χρώματος (4άδα αριθμών) δηλώνουμε 
+//  το attribute του σημείου της εικόνας texture (2άδα αριθμών) 
+//	attribute vec4 aVertexColor; 
+
+	attribute vec2 aTextureCoordinates;
+	
+	uniform mat4 uTransformMatrix; 
+	uniform mat4 uPerspectiveViewMatrix;
+
+//	ΕΤΟΙΜΟ.2. Αντί για το varying του χρώματος (που μεταφέρει πληροφορία στο fragment shader),
+//	έχουμε το varying του texture	
+//	varying vec4 vColor; 
+
+	varying vec2 vTextureCoordinates;
+
+	void main() {
+		gl_Position = uPerspectiveViewMatrix * uTransformMatrix * aVertexPosition; 
+
+		//	ΕΤΟΙΜΟ.3. Αντί να δώσουμε στο παλιό varying χρώμα που ερχόταν στο αντίστοιχο παλιό attribute
+		//	δίνονται στο νέο varying οι συντεταγμένες που ήρθαν στο αντίστοιχο νέο attribute
+		//	vColor = aVertexColor;
+		
+		vTextureCoordinates = aTextureCoordinates;  
+	} 
+</script>
+
+
+<script id="fShader" type="x-shader/x-fragment">
+	precision mediump float; 
+//	ΕΤΟΙΜΟ.4. Το ίδιο varying που δηλώθηκε παραπάνω στο vertex shader, 
+//	δηλώνεται στο fragment shader για την υποδοχή της πληροφορίας
+//	varying vec4 vColor;
+	
+	varying vec2 vTextureCoordinates;
+
+//	ΕΤΟΙΜΟ.5. Δηλώνεται ένα νέο uniform στο fragment shader που θα χρησιμεύσει 
+//	για την επιλογή του κατάλληλου χρώματος/pixel από την εικόνα που δίνεται σαν texture 
+//	με βάση την απόσταση από τις κορυφές 
+
+	uniform sampler2D uSampler;
+	
+	void main() {
+//		ΕΤΟΙΜΟ.6. Αντί της απλής μεταφοράς της τιμής που ήρθε μέσω varying απ'ευθείας στο gl_FragColor,
+//		χρησιμοποιείται το νέο uniform και η συνάρτηση βιβλιοθήκης texture2D 
+//		για την επιλογή του κατάλληλου texel (texture-pixel) από την εικόνα της υφής
+//		gl_FragColor = vColor;
+
+		gl_FragColor = texture2D(uSampler, vTextureCoordinates);
+	}
+</script>
+
+
+
+<script>
+var gl; 
+var canvas; 
+var shaderProgram; 
+
+var vertexPositionAttributePointer; 
+// 	ΕΤΟΙΜΟ.7. Αντί για pointer για τη θέση του attribute του χρώματος δηλώνουμε μια global για τον pointer 
+// 	της θέσης του attribute του texture (ΕΤΟΙΜΟ.1.)
+// 	var vertexColorAttributePointer;
+var textureCoordinatesAttributePointer;
+
+var transformUniformPointer;
+var perspectiveViewUniformPointer;
+
+//	ΕΤΟΙΜΟ.8. Νέα global μεταβλητή για pointer στη θέση του νέου uniform που δηλώθηκε στο fragment shader (ΕΤΟΙΜΟ.5.)
+var samplerUniformPointer;
+
+var vertexBuffer; 
+//	ΕΤΟΙΜΟ.9. Αντί για τον buffer του χρώματος της πυραμίδας (καταργείται) θα δηλωθεί παρακάτω αντίστοιχος για το texture
+//  var colorBuffer; 
+var indexBuffer; 
+
+var floorVBuffer;
+//	ΕΤΟΙΜΟ.10. Αντί για τον buffer του χρώματος του πατώματος (καταργείται) θα δηλωθεί παρακάτω αντίστοιχος για το texture
+//	var floorCBuffer;
+var floorIBuffer;
+
+// ΕΤΟΙΜΟ.11. Θα χρησιμοποιήσουμε έναν κοινό buffer για όλα τα textures 
+// (δεν είναι υποχρεωτικό, το κάνουμε για να απλοποιηθεί ο κώδικας)
+// O buffer αυτός θα περιέχει τις θέσεις της εικόνας που αντιστοιχούν στις κορυφές του buffer των κορυφών
+var textureBuffer;
+
+// ΕΤΟΙΜΟ.12. Δηλώνουμε δύο νέες global μεταβλητές που θα είναι αντικείμενα texture
+var pyramidTexture;
+var floorTexture;
+// ΒΗΜΑ.1. Δηλώστε μια νέα global μεταβλητή για το αντικείμενο texture του skybox
+
+
+var totalAngle=0; 
+var totalZ=0.25;
+
+var requestId=0; 
+  
+function createGLContext(canvas) {
+	var context = null;
+
+	context = canvas.getContext("webgl");  
+	if (!context)
+		context = canvas.getContext("experimental-webgl"); 
+	if (context) {
+		context.viewportWidth = canvas.width; 
+		context.viewportHeight = canvas.height; 
+	} 
+	else {
+		alert("Failed to create WebGL context!");
+	}
+	return context;
+}
+
+function loadShader(type, shaderSource) {
+	var shader = gl.createShader(type); 
+	gl.shaderSource(shader, shaderSource); 
+	gl.compileShader(shader); 
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { 
+		alert("Error compiling shader" + gl.getShaderInfoLog(shader)); 
+		gl.deleteShader(shader);  
+		return null;
+	}
+	return shader;  
+}
+
+function setupShaders() {
+	var vertexShaderSource = document.getElementById("vShader").textContent; 
+	
+	var fragmentShaderSource = document.getElementById("fShader").textContent; 
+	
+	var vertexShader = loadShader(gl.VERTEX_SHADER, vertexShaderSource); 
+	var fragmentShader = loadShader(gl.FRAGMENT_SHADER, fragmentShaderSource); 
+
+	shaderProgram = gl.createProgram(); 
+	gl.attachShader(shaderProgram, vertexShader); 
+	gl.attachShader(shaderProgram, fragmentShader); 
+	gl.linkProgram(shaderProgram); 
+
+	if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+		alert("Failed to setup shaders");
+	}
+
+	gl.useProgram(shaderProgram); 
+
+	vertexPositionAttributePointer = gl.getAttribLocation(shaderProgram, "aVertexPosition"); 
+	gl.enableVertexAttribArray(vertexPositionAttributePointer); 
+//	ΕΤΟΙΜΟ.13. Αντί να "θυμόμαστε" τη θέση του attribute του χρώματος και να το ενεργοποιήσουμε, 
+//	"θυμόμαστε" και ενεργοποιούμε το attribute του texture (ΕΤΟΙΜΟ.1.) μέσω του pointer που δηλώσαμε (ΕΤΟΙΜΟ.7.)
+//	vertexColorAttributePointer = gl.getAttribLocation(shaderProgram, "aVertexColor"); 
+//	gl.enableVertexAttribArray(vertexColorAttributePointer);
+	textureCoordinatesAttributePointer = gl.getAttribLocation(shaderProgram, "aTextureCoordinates");
+	gl.enableVertexAttribArray(textureCoordinatesAttributePointer);
+	
+	transformUniformPointer = gl.getUniformLocation(shaderProgram, "uTransformMatrix"); 
+	perspectiveViewUniformPointer = gl.getUniformLocation(shaderProgram, "uPerspectiveViewMatrix");
+	
+//	ΕΤΟΙΜΟ.14. "Θυμόμαστε" και το νέο uniform (ΕΤΟΙΜΟ.5.) μέσω του pointer που δηλώσαμε (ΕΤΟΙΜΟ.8.)	
+	samplerUniformPointer = gl.getUniformLocation(shaderProgram, "uSampler");
+}
+
+function setupBuffers() {
+
+// Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των κορυφών της κεντρικής πυραμίδας (οι άλλες προκύπτουν με μετασχηματισμούς μετακίνησης)
+	vertexBuffer = gl.createBuffer(); 
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); 
+	var triangleVertices = [
+							0.0, 0.2, -0.2, 1.0,
+							0.2, -0.2, -0.2, 1.0,
+							-0.2, -0.2, -0.2, 1.0,
+							0.0, 0.0, 0.2, 1.0
+							];
+	
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices),	gl.STATIC_DRAW);
+	vertexBuffer.itemSize = 4; 
+	vertexBuffer.numberOfItems = 4; 
+// Τέλος δημιουργίας/ενημέρωσης buffer κορυφών κεντρικής πυραμίδας
+
+// ΕΤΟΙΜΟ.15.Δε θα χρειαστούμε χρώματα για τις κορυφές της πυραμίδας
+/*	colorBuffer=gl.createBuffer(); 
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+	var colorVertices = [1.0,0.0,0.0,1.0,
+						0.0,1.0,0.0,1.0,
+						0.0,0.0,1.0,1.0,
+						1.0,1.0,0.0,1.0];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVertices),	gl.STATIC_DRAW);
+	colorBuffer.itemSize=4;
+	colorBuffer.numberOfItems=4;
+*/
+
+
+// Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των ΔΕΙΚΤΩΝ (indices) των κορυφών της κεντρικής πυραμίδας	
+	indexBuffer = gl.createBuffer(); 
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
+	var indexMatrix = [
+							0,1,2,
+							0,3,1,
+							0,2,3,
+							2,1,3
+						];
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexMatrix),gl.STATIC_DRAW);   
+	indexBuffer.itemSize=1; 
+	indexBuffer.numberOfItems = 12;  
+// Τέλος δημιουργίας/ενημέρωσης buffer ΔΕΙΚΤΩΝ (indices) των κορυφών κεντρικής πυραμίδας
+		
+	floorVBuffer = gl.createBuffer(); 
+	gl.bindBuffer(gl.ARRAY_BUFFER, floorVBuffer); 
+	var floorVMatrix = [
+							-1.0, -1.0, -0.2, 1.0,
+							1.0, -1.0, -0.2, 1.0,
+							-1.0, 1.0, -0.2, 1.0,
+							1.0, 1.0, -0.2, 1.0
+							];
+	
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(floorVMatrix),	gl.STATIC_DRAW);
+	floorVBuffer.itemSize = 4; 
+	floorVBuffer.numberOfItems = 4; 
+
+/*	ΕΤΟΙΜΟ.16. Δε θα χρειαστούμε χρώματα για τις κορυφές του πατώματος
+	floorCBuffer=gl.createBuffer(); 
+	gl.bindBuffer(gl.ARRAY_BUFFER, floorCBuffer);
+	var floorCMatrix = [1.0,0.0,0.0,1.0,
+						0.0,1.0,0.0,1.0,
+						0.0,0.0,1.0,1.0,
+						1.0,1.0,0.0,1.0];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(floorCMatrix),	gl.STATIC_DRAW);
+	floorCBuffer.itemSize=4;
+	floorCBuffer.numberOfItems=4;
+*/
+
+	floorIBuffer = gl.createBuffer(); 
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,floorIBuffer); 
+	var floorIMatrix = [
+							0,1,2,
+							2,1,3
+						];
+	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(floorIMatrix),gl.STATIC_DRAW);   
+	floorIBuffer.itemSize=1; 
+	floorIBuffer.numberOfItems = 6;  
+
+//	ΕΤΟΙΜΟ.17. Αντί για τα χρώματα, δημιουργούμε έναν buffer για το texture, 
+//	τον ενεργοποιούμε, του ετοιμάζουμε δεδομένα σε έναν πίνακα,
+//	του τα "ταΐζουμε και καθορίζουμε τις ιδιότητες του, όλα κατά τα γνωστά.
+//	Οι συντεταγμένες που δίνουμε μέσα στον πίνακα είναι τα σημεία της εικόνας texture 
+//	(σε μορφή συντεταγμένων από 0..1, τα λεγόμενα s,t όπου 0,0 το κάτω αριστερό άκρο της εικόνας και 1,1 το πάνω δεξιά)
+//	από τα οποία θέλουμε να πάρουν χρώμα οι αντίστοιχες κορυφές στον πίνακα κορυφών.
+// ΠΑΡΑΤΗΡΕΙΣΤΕ ΤΗΝ ΑΝΤΙΣΤΟΙΧΙΣΗ ΜΕ ΤΙΣ ΣΥΝΤΕΤΑΓΜΕΝΕΣ ΤΩΝ ΚΟΡΥΦΩΝ ΩΣΤΕ Η ΕΙΚΟΝΑ ΠΟΥ ΘΑ ΔΗΜΙΟΥΡΓΗΘΕΙ
+// ΣΤΟ ΠΑΤΩΜΑ ΝΑ "ΣΤΕΚΕΙ" ΣΕ ΣΧΕΣΗ ΜΕ ΤΗΝ ΕΙΚΟΝΑ ΠΟΥ ΧΡΗΣΙΜΟΠΟΙΟΥΜΕ ΓΙΑ TEXTURE (ΝΑ ΜΗΝ ΠΑΡΑΜΟΡΦΏΝΕΤΑΙ)
+	textureBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+	var textureCoordinates=[0.0,0.0,
+						1.0,0.0,
+						0.0,1.0,
+						1.0,1.0];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),gl.STATIC_DRAW);  
+	textureBuffer.itemSize = 2;
+	textureBuffer.numberOfItems = 4;	
+
+///	ΕΤΟΙΜΟ.18. Δημιουργούμε ένα αντικείμενο texture για την πυραμίδα στην 
+//	αντίστοιχη global μεταβλητή που δηλώσαμε	(ΕΤΟΙΜΟ.12)
+	pyramidTexture = gl.createTexture();
+//	ΕΤΟΙΜΟ.19. Υποδεικνύουμε την τοποθεσία της εικόνας (χωρίς path εννοείται στο ίδιο directory)
+	var textureUrl = "stone.jpg";
+//	ΕΤΟΙΜΟ.20. Καλούμε αυτήν την custom συνάρτηση που ενημερώνει το texture
+//	αφού έχει φορτωθεί η εικόνα (δες μέσα στη συνάρτηση)
+	loadImageForTexture(textureUrl, pyramidTexture);
+	
+	
+//	ΕΤΟΙΜΟ.22. Ομοίως με τα ΕΤΟΙΜΟ.18 - ΕΤΟΙΜΟ.20 για το texture του πατώματος
+	floorTexture = gl.createTexture();
+	var textureUrl = "pada.jpg";
+	loadImageForTexture(textureUrl, floorTexture);	
+	
+//	ΒΗΜΑ.2. Προσθέστε τις αντίστοιχες εντολές για το texture του skybox χρησιμοποιώντας την εικόνα sky.jpg
+
+
+	
+}
+
+//	ΕΤΟΙΜΟ.21. Custom συνάρτηση για σύνδεση αντικειμένου texture με εικόνα και προεπεξεργασία εικόνας
+function loadImageForTexture(url, textureObject) {
+// 	21.1. Δημιούργησε ένα νέο αντικείμενο εικόνα
+	var image = new Image();
+//	21.2. Όταν φορτώνεται θα τρέχει την παρακάτω συνάρτηση
+	image.onload = function() {    
+		// 21.2.1. ενεργοποιουμε ως τρέχον texture αυτό που δοθηκε σαν παραμετρος
+		gl.bindTexture(gl.TEXTURE_2D, textureObject);
+		// 21.2.2. αντιστρεφουμε το y γιατι στην εικονα μετραει απο πανω προσ τα κατω 
+		// (αν εχει σημασια το πανω-κατω στην υφη μας)
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+		// 21.2.3. αντιγραφουμε την εικονα στο ενεργοποιημενο texture
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+		// 21.2.4. καθοριζουμε πώς θα γεννιουνται νεα pixels αν χρειαζονται
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		// 21.2.5. καθοριζουμε πώς θα συμπτυσσονται pixels αν χρειαζεται
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
+		// 21.2.6. αν αντι για gl.LINEAR στην τελευταια εντολη εχουμε χρησιμοποιησει gl.LINEAR_MIPMAP_NEAREST
+		// εννοείται ότι θα έχουμε εναλλακτικες εκδοχες του texture μικροτερης αναλυσης (mipmapping)
+		// που θα έχουν δημιουργηθεί με την παρακάτω εντολή generateMipmap. 
+		gl.generateMipmap(gl.TEXTURE_2D);
+	};
+//	21.3 Φόρτωσε την εικόνα
+	image.src = url;	
+}
+
+
+
+function redraw() { 
+
+	var localAngle = parseFloat(document.getElementById("angleText").value); 
+	totalAngle = totalAngle + localAngle*Math.PI/180.0; 
+
+	var localZ = parseFloat(document.getElementById("heightText").value); 
+	totalZ += localZ; 
+
+	
+// Δημιουργία πίνακα και τάισμα στο uniform θέσης κάμερας/προοπτικής	
+	var pvMatrix = mat4.create();
+
+	var vMatrix = mat4.create();
+	var c = Math.cos(totalAngle);
+	var s = Math.sin(totalAngle);
+	
+	mat4.lookAt(vMatrix,[2*c,2*s,totalZ],[0,0,0],[0,0,1]);
+
+	var pMatrix = mat4.create();
+	mat4.perspective(pMatrix,Math.PI/2,1,0.01,1000);
+
+	mat4.multiply(pvMatrix,pMatrix,vMatrix);
+
+	gl.uniformMatrix4fv(perspectiveViewUniformPointer, false, new Float32Array(pvMatrix));
+// Τέλος δημιουργίας πίνακα και ταΐσματος στο uniform θέσης κάμερας/προοπτικής	
+		
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+
+
+// ΑΡΧΗ 1ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΑΡΧΗ ΕΝΕΡΓΟΠΟΙΗΣΗΣ ΚΑΙ ΑΝΤΙΣΤΟΙΧΙΣΗΣ ΤΩΝ ATTRIBUTES ΤΟΥ VERTEX SHADER ME ΤΟΥΣ ΚΑΤΑΛΛΗΛΟΥΣ BUFFERS	
+	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+	gl.vertexAttribPointer(vertexPositionAttributePointer, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	
+	/*	ΕΤΟΙΜΟ.23. Δεν έχουμε πια χρώματα 
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+	gl.vertexAttribPointer(vertexColorAttributePointer, colorBuffer.itemSize, gl.FLOAT, false, 0, 0); 
+	*/
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
+	
+	// 	ΕΤΟΙΜΟ.24 ΕΝΕΡΓΟΠΟΙΟΥΜΕ ΤΗΝ ΠΡΩΤΗ ΔΙΑΘΕΣΙΜΗ TEXTURE UNIT, ΔΗΛΑΔΗ ΤΗΝ gl.TEXTURE0 (ΜΗΔΕΝ)
+	gl.activeTexture(gl.TEXTURE0);
+	//	ΕΤΟΙΜΟ.25. ΚΑΙ ΤΗ ΣΥΝΔΕΟΥΜΕ ΜΕ ΤΟ TEXTURE ΠΟΥ ΘΕΛΟΥΜΕ ΕΝΕΡΓΟΠΟΙΩΝΤΑΣ ΤΟ ΚΙ ΑΥΤΟ
+	gl.bindTexture(gl.TEXTURE_2D, pyramidTexture); 
+	//  ΕΤΟΙΜΟ.26. ΕΝΗΜΕΡΩΝΟΥΜΕ ΤΟ UNIFORM ΓΙΑ ΤΟ ΠΟΙΑ TEXTURE UNIT ΕΙΝΑΙ ΕΝΕΡΓΟΠΟΙΗΜΕΝΗ, ΣΤΗΝ ΠΡΟΚΕΙΜΕΝΗ ΠΕΡΙΠΤΩΣΗ Η 0
+	gl.uniform1i(samplerUniformPointer, 0);
+
+	//  ΕΤΟΙΜΟ.27. ΕΝΕΡΓΟΠΟΙΟΥΜΕ ΤΟΝ BUFFER TOY TEXTURE	
+	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+	//  ΕΤΟΙΜΟ.28. ΕΝΗΜΕΡΩΝΟΥΜΕ ΤΟ ΣΧΕΤΙΚΟ ATTRIBUTE
+	gl.vertexAttribPointer(textureCoordinatesAttributePointer, textureBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+// ΤΕΛΟΣ 1ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΤΕΛΟΣ ΕΝΕΡΓΟΠΟΙΗΣΗΣ ΚΑΙ ΑΝΤΙΣΤΟΙΧΙΣΗΣ ΤΩΝ ATTRIBUTES ΤΟΥ VERTEX SHADER ΜΕ ΤΟΥΣ ΚΑΤΑΛΛΗΛΟΥΣ BUFFERS ΤΗΣ ΠΥΡΑΜΙΔΑΣ
+	
+	var p;
+	for(p=-0.5; p<=0.5; p+=0.5)
+	{
+		// ΑΡΧΗ 2ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΑΡΧΗ ΔΗΜΙΟΥΡΓΙΑΣ/ΕΝΗΜΕΡΩΣΗΣ ΠΙΝΑΚΑ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ, ΤΑΪΣΜΑΤΟΣ ΣΤΟ ΑΝΤΙΣΤΟΙΧΟ uniform ΚΑΙ ΣΧΕΔΙΑΣΗΣ
+		var temp=mat4.create();
+		mat4.fromTranslation(temp,[p,p,0]);
+		gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
+		gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
+		// ΤΕΛΟΣ 2ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΤΕΛΟΣ ΔΗΜΙΟΥΡΓΙΑΣ/ΕΝΗΜΕΡΩΣΗΣ ΠΙΝΑΚΑ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ, TAΪΣΜΑΤΟΣ ΣΤΟ ΑΝΤΙΣΤΟΙΧΟ uniform ΚΑΙ ΣΧΕΔΙΑΣΗΣ
+	}	
+
+// ΑΡΧΗ 1ων ΕΡΓΑΣΙΩΝ ΠΑΤΩΜΑΤΟΣ	
+	gl.bindBuffer(gl.ARRAY_BUFFER, floorVBuffer);
+	gl.vertexAttribPointer(vertexPositionAttributePointer, floorVBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	
+	//	ΕΤΟΙΜΟ.29. Δεν έχουμε πια χρώματα
+	//	gl.bindBuffer(gl.ARRAY_BUFFER, floorCBuffer);
+	//	gl.vertexAttribPointer(vertexColorAttributePointer, floorCBuffer.itemSize, gl.FLOAT, false, 0, 0); 
+	
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,floorIBuffer); 
+
+//	ΕΤΟΙΜΟ.30. Τα αντίστοιχα με τα ΕΤΟΙΜΟ.24 - ΕΤΟΙΜΟ.26 αλλά για το πάτωμα
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, floorTexture); 
+	gl.uniform1i(samplerUniformPointer, 1);	
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, textureBuffer);
+	gl.vertexAttribPointer(textureCoordinatesAttributePointer, textureBuffer.itemSize, gl.FLOAT, false, 0, 0);
+// ΤΕΛΟΣ 1ων ΕΡΓΑΣΙΩΝ ΠΑΤΩΜΑΤΟΣ	
+
+// ΑΡΧΗ 2ων ΕΡΓΑΣΙΩΝ ΠΑΤΩΜΑΤΟΣ	
+	var temp=mat4.create();
+	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
+	// ΕΠΙΛΟΓΟΣ. gl.polygonOffset(-1,1);
+	// ΕΠΙΛΟΓΟΣ. gl.enable(gl.POLYGON_OFFSET_FILL);
+	gl.drawElements(gl.TRIANGLES,floorIBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);   
+	// ΕΠΙΛΟΓΟΣ. gl.disable(gl.POLYGON_OFFSET_FILL);
+// ΤΕΛΟΣ 2ων ΕΡΓΑΣΙΩΝ ΠΑΤΩΜΑΤΟΣ
+
+// ΒΗΜΑ.3. Προσθέστε τις κατάλληλες εντολές για τις αντίστοιχες εργασίες για το skybox. 
+// Το skybox θα είναι μια κλιμακωμένη πυραμίδα.
+
+// Αρχή 1ων εργασιών skybox - το μόνο που αλλάζει σε σχέση με την πυραμίδα είναι η texture unit 
+// (εδώ αντί 0 ή 1 θα είναι το 2) 
+// και το αντικείμενο texture (αντί για pyramidTexture θα είναι αυτό που δηλώσατε και δημιουργήσατε) 
+	
+// Τέλος 1ων εργασιών skybox
+
+// Αρχή 2ων εργασιών skybox - παρόμοιες εντολές με αυτές μέσα στο loop, η διαφορά είναι ότι αντί για μετακίνηση,
+//								χρειαζόμαστε έναν πίνακα μετασχηματισμού scale επί 2000 σε κάθε άξονα 
+//								χρησιμοποιήστε τη συνάρτηση mat4.fromScaling με παραμέτρους πίνακα-αποδέκτη και τριάδα [sX,sY,sZ]
+
+
+// Τέλος 2ων εργασιών skybox
+}
+
+function startup() {
+	canvas = document.getElementById("myGLCanvas"); 
+	var minDimension=Math.min(window.innerWidth,window.innerHeight); 
+	canvas.width=0.9*minDimension; 
+	canvas.height=0.9*minDimension; 
+	gl = WebGLDebugUtils.makeDebugContext(createGLContext(canvas)); 
+	setupShaders(); 
+	setupBuffers(); 
+	gl.clearColor(0.0, 0.0, 0.0, 1.0); 
+	
+	gl.enable(gl.DEPTH_TEST); 
+		
+	startAnim(); 
+}
+
+function startAnim() {
+	if (!requestId)
+		anim();
+}
+
+function anim() {
+	requestId = window.requestAnimationFrame(anim);
+	redraw();
+}
+
+function stopAnim() {
+	window.cancelAnimationFrame(requestId);
+	requestId = 0;
+}
+</script>
+
+</head>
+
+<body onload="startup()">
+<canvas id="myGLCanvas" >
+</canvas>
+<p>
+Rotate camera by:<input type="text" id="angleText" value="1">
+Raise camera by:<input type="text" id="heightText" value="0.01">
+<button onClick=startAnim()>Start</button>
+<button onClick=stopAnim()>Stop</button>
+</p>
+</body>
+</html>
+<!--
+--ΠΡΟΛΟΓΟΣ: Textures
+Στον κώδικα έχουν προστεθεί εντολές για τη χρήση texture (υφής) αντί απλού χρώματος στα αντικείμενα. 
+Ακολουθείστε (διαβάζοντας μόνο) τα ΕΤΟΙΜΟ για να δείτε τις αλλαγές.
+		
+--ΚΥΡΙΩΣ ΘΕΜΑ: Skybox με texture
+Το ζητούμενο είναι να προστεθεί ένα skybox (για την ακρίβεια sky-pyramid..) που περικλείει όλη τη σκηνή και έχει υφή ουρανού.
+Ακολουθείστε τα ΒΗΜΑτα για να το κατασκευάσετε.
+
+--ΕΠΙΛΟΓΟΣ: z-Fighting
+Στο τέλος της draw και της redraw υπάρχουν 3 "σχολιασμένες" εντολές ΕΠΙΛΟΓΟΣ. Τρέξτε τον κώδικα με βήμα ύψους κάμερας -0.01 και με 
+τις εντολές σχολιασμένες (όπως είναι) και κατόπιν αφαιρέστε τα σχόλια και ξανατρέξτε τον. 
+Παρατηρείστε τη διαφορά στο κάτω μέρος του πατώματος (z-fighting και αποφυγή του μέσω στοιχειώδους αλλαγής του z για ενα αντικείμενο)
+-->

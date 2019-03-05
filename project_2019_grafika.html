@@ -1,0 +1,221 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<script src="webgl-debug.js"></script>
+<script src="gl-matrix-min.js"></script>
+<script id="vShader" type="x-shader/x-vertex">
+
+	attribute vec4 aVertexPosition;
+	attribute vec4 aVertexColor;
+	
+	uniform mat4 uTransformMatrix; 
+		
+	
+	varying vec4 vColor;
+	
+	void main() {
+		gl_Position =uTransformMatrix * aVertexPosition; 
+		
+		vColor = aVertexColor; 
+	} 
+</script>
+<script id="fShader" type="x-shader/x-fragment">
+	precision mediump float; 
+	varying vec4 vColor; 
+	void main() {
+		gl_FragColor = vColor;
+	}
+</script>
+
+<script>
+	var gl; 
+	var canvas; 
+	var shaderProgram; 
+	var vertexBuffer; 
+	var colorBuffer; 
+	var vertexPositionAttributePointer;
+	var vertexColorAttributePointer;
+	var indexBuffer;
+	
+	var transformUniformPointer;
+	var requestId=0;
+	var totalAngle = 0;
+	
+	//FUNCTION createGLContext
+	
+	function createGLContext(canvas) {
+		var context = null;
+
+		context = canvas.getContext("webgl");  
+		if (!context)
+			context = canvas.getContext("experimental-webgl"); 
+		if (context) {
+			context.viewportWidth = canvas.width; 
+			context.viewportHeight = canvas.height; 
+		} 
+		else {
+			alert("Failed to create WebGL context!");
+		}
+		return context;
+	}
+	
+	//FUNCTION loadShader
+	
+	function loadShader(type, shaderSource) {
+		var shader = gl.createShader(type); 
+		gl.shaderSource(shader, shaderSource); 
+		gl.compileShader(shader); 
+
+		if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) { 
+			alert("Error compiling shader" + gl.getShaderInfoLog(shader)); 
+			gl.deleteShader(shader);  
+			return null;
+		}
+		return shader;  
+	}
+	
+	//FUNCTION setupShaders
+	
+	function setupShaders() {
+		var vertexShaderSource = document.getElementById("vShader").textContent; 
+	
+		var fragmentShaderSource = document.getElementById("fShader").textContent; 
+	
+		var vertexShader = loadShader(gl.VERTEX_SHADER, vertexShaderSource); 
+		var fragmentShader = loadShader(gl.FRAGMENT_SHADER, fragmentShaderSource); 
+
+		shaderProgram = gl.createProgram(); 
+		gl.attachShader(shaderProgram, vertexShader); 
+		gl.attachShader(shaderProgram, fragmentShader); 
+		gl.linkProgram(shaderProgram); 
+
+		if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+			alert("Failed to setup shaders");
+		}
+
+		gl.useProgram(shaderProgram); 
+
+		vertexPositionAttributePointer = gl.getAttribLocation(shaderProgram, "aVertexPosition"); 
+
+		gl.enableVertexAttribArray(vertexPositionAttributePointer); 
+	
+		vertexColorAttributePointer = gl.getAttribLocation(shaderProgram, "aVertexColor"); 
+		gl.enableVertexAttribArray(vertexColorAttributePointer);
+	
+		transformUniformPointer = gl.getUniformLocation(shaderProgram, "uTransformMatrix"); 
+	}
+	
+	//FUNCTION setupBuffers
+	
+	function setupBuffers() {
+		vertexBuffer = gl.createBuffer(); 
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); 
+		var rectangleVertices = [
+								-0.5, 0.5, 0.5, 1.0,
+								0.5, 0.5, 0.5, 1.0,
+								0.5, -0.5, 0.5, 1.0,
+								-0.5, -0.5, 0.5, 1.0
+								];
+	
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(rectangleVertices),	gl.STATIC_DRAW);
+		vertexBuffer.itemSize = 4; 
+		vertexBuffer.numberOfItems = 4; 
+	
+		colorBuffer=gl.createBuffer(); 
+		gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+		var colorVertices = [    1.0,0.0,0.0,1.0,
+							0.0,1.0,0.0,1.0,
+							0.0,0.0,1.0,1.0,
+							1.0,1.0,0.0,1.0
+						];
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVertices),	gl.STATIC_DRAW);
+		colorBuffer.itemSize=4;
+		colorBuffer.numberOfItems=4;
+		
+		indexBuffer = gl.createBuffer(); 
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
+		var indexMatrix = [
+								0,1,2,
+								0,3,2
+							];
+		gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexMatrix),gl.STATIC_DRAW);   
+		indexBuffer.itemSize=1; 
+		indexBuffer.numberOfItems = 6;
+	}
+	
+	//FUNCTION redraw
+	
+	function redraw() {
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+	
+		gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+		gl.vertexAttribPointer(vertexPositionAttributePointer, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
+	
+		gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+		gl.vertexAttribPointer(vertexColorAttributePointer, colorBuffer.itemSize, gl.FLOAT, false, 0, 0); 
+	
+		gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
+		var localAngle = 0;
+		for(p=0;p<4;p++){
+			var temp=mat4.create();
+			mat4.fromYRotation(temp,totalAngle+localAngle);
+			gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
+			gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
+			localAngle+= 90*Math.PI/180.0;
+		}
+			totalAngle += Math.PI/180.0;
+	
+	}
+	
+	//FUNCTION startup
+	
+	function startup() {
+		canvas = document.getElementById("myGLCanvas"); 
+		var minDimension=Math.min(window.innerWidth,window.innerHeight); 
+		canvas.width=0.9*minDimension; 
+		canvas.height=0.9*minDimension; 
+		gl = WebGLDebugUtils.makeDebugContext(createGLContext(canvas)); 
+		setupShaders(); 
+		setupBuffers(); 
+		gl.clearColor(0.5, 0.5, 0.5, 1.0); 
+	
+		gl.enable(gl.DEPTH_TEST); 
+		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 	
+		redraw(); 
+	}
+	
+	//FUNCTION startAnim	
+	
+	function startAnim() {
+		if (!requestId)
+			anim();
+	}
+
+	//FUNCTION anim
+
+	function anim() {
+		requestId = window.requestAnimationFrame(anim);
+		redraw();
+	}
+	
+	//FUNCTION stopAnim	
+	
+	function stopAnim() {
+		window.cancelAnimationFrame(requestId);
+		requestId = 0;
+	}
+</script>
+
+</head>
+
+<body onload="startup()">
+<canvas id="myGLCanvas" >
+</canvas>
+<p>
+<button onClick=startAnim()>Start</button>
+<button onClick=stopAnim()>Stop</button>
+</p>
+</body>
+</html>
+

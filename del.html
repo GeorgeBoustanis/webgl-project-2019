@@ -1,0 +1,22 @@
+<html>
+<head>
+<script>	
+	function startAnim(){	
+		var adiv = document.getElementById('mydiv');
+		var leftpos = 0;
+		setInterval(function(){
+		var rand = Math.random();
+		console.log(rand%2);
+		if(rand > 0.5)
+    			adiv.style.color = 'red'; // move div by 5 pixels each time
+    		else
+    			adiv.style.color = 'green';
+		}, 50);
+	}
+	</script>
+</head>
+<body onload="startAnim()">
+	<div id="mydiv">
+	Halt
+	</div>
+</html>
