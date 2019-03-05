@@ -237,10 +237,10 @@ function redraw() {
 	var c = Math.cos(totalAngle);
 	var s = Math.sin(totalAngle);
 	
-	mat4.lookAt(vMatrix,[2*s,2*c,totalZ],[0,0,0],[0,0,1]);
+	mat4.lookAt(vMatrix,[2,2,2],[0,0,0],[0,1,0]);
 
 	var pMatrix = mat4.create();
-	mat4.perspective(pMatrix,Math.PI/2,1,0.01,1000);
+	mat4.perspective(pMatrix,Math.PI/2,1,0.01,10);
 
 	mat4.multiply(pvMatrix,pMatrix,vMatrix);
 
