@@ -145,14 +145,14 @@ function setupBuffers() {
 // Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των ΧΡΩΜΑΤΩΝ των κορυφών της κεντρικής πυραμίδας
 	colorBuffer=gl.createBuffer(); 
 	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-	var colorVertices = [1.0,0.0,0.0,1.0,
-						0.0,1.0,0.0,1.0,
-						0.0,0.0,1.0,1.0,
-						1.0,1.0,0.0,1.0,
-						1.0,0.0,0.0,1.0,
-						0.0,1.0,0.0,1.0,
-						0.0,0.0,1.0,1.0,
-						1.0,1.0,0.0,1.0
+	var colorVertices = [0.329, 0.537, 0.713, 1.0,
+						0.329, 0.537, 0.713, 1.0,
+						0.180, 0.266, 0.862, 1.0,
+						0.180, 0.635, 0.862, 1.0,
+						0.082, 0.258, 0.698, 1.0,
+						0.082, 0.258, 0.698, 1.0,
+						0.235, 0.105, 0.772, 1.0,
+						0.235, 0.105, 0.772, 1.0
 						];
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVertices),	gl.STATIC_DRAW);
 	colorBuffer.itemSize=4;
@@ -237,7 +237,7 @@ function redraw() {
 	var c = Math.cos(totalAngle);
 	var s = Math.sin(totalAngle);
 	
-	mat4.lookAt(vMatrix,[1,1,1],[0,0,0],[0,0,1]);
+	mat4.lookAt(vMatrix,[2*s,2*c,totalZ],[0,0,0],[0,0,1]);
 
 	var pMatrix = mat4.create();
 	mat4.perspective(pMatrix,Math.PI/2,1,0.01,1000);
