@@ -38,7 +38,10 @@ var vertexBuffer;
 var colorBuffer; 
 var vertexPositionAttributePointer; // Η διεύθυνση του attribute aVertexPosition
 var vertexColorAttributePointer; // Η διεύθυνση του attribute aVertexColor
-var indexBuffer; 
+var indexBuffer;
+var start = 0;
+var perspDistHigh = 10; //αν εκτελεστει η redraw πανω απο μια φορες τοτε το perspDist θα γινει cameraDistance * 10
+var perspDistLow = 0.01;
 
 // ΒΗΜΑ.1. Προσθέστε τρεις νέους buffers: (α) για τις κορυφές του πατώματος, (β) για τα χρώματα των κορυφών του πατώματος και (γ) για τους indices των κορυφών του πατώματος
 // Προτεινόμενα ονόματα: floorVBuffer, floorCBuffer, floorIBuffer
@@ -188,14 +191,9 @@ function setupBuffers() {
 
 
 function redraw() {
+	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
 	var cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
 	var cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
-
-	var localAngle = parseFloat(document.getElementById("angleText").value); 
-	totalAngle = totalAngle + localAngle*Math.PI/180.0;
-	
-	var localZ = parseFloat(document.getElementById("heightText").value); 
-	totalZ += localZ;
 	
 	var selectPos = document.querySelector('input[name="position"]:checked').value;
 	var tokens = selectPos.split("-");
@@ -246,13 +244,17 @@ function redraw() {
 	var pvMatrix = mat4.create();
 
 	var vMatrix = mat4.create();
-	var c = Math.cos(totalAngle);
-	var s = Math.sin(totalAngle);
 	
 	mat4.lookAt(vMatrix,[fx*cameraDistance,fy*cameraDistance,fz*cameraDistance],[0,0,0],[0,1,0]);
 
 	var pMatrix = mat4.create();
-	mat4.perspective(pMatrix,Math.PI/4,1,0.01,10);
+	
+	if(start > 1){
+		perspDistHigh = cameraDistance * 10;
+		perspDistLow = 0.001;
+	}
+	
+	mat4.perspective(pMatrix,Math.PI/2,1,perspDistLow,perspDistHigh);
 
 	mat4.multiply(pvMatrix,pMatrix,vMatrix);
 
@@ -306,20 +308,7 @@ function startup() {
 	redraw(); 
 }
 
-function startAnim() {
-	if (!requestId)
-		anim();
-}
 
-function anim() {
-	requestId = window.requestAnimationFrame(anim);
-	redraw();
-}
-
-function stopAnim() {
-	window.cancelAnimationFrame(requestId);
-	requestId = 0;
-}
 </script>
 
 </head>
@@ -327,26 +316,21 @@ function stopAnim() {
 <body onload="startup()">
 <canvas id="myGLCanvas" >
 </canvas>
-<p>
-Rotate by:<input type="text" id="angleText" value="1">
-<button onClick=startAnim()>Start</button>
-<button onClick=stopAnim()>Stop</button>
-Raise camera by:<input type="text" id="heightText" value="0.01">
-</p>
 
+<br>
 camera view (degrees):<input type="text" id="cameraView" value="90">
 <br>
 camera distance:<input type="text" id="cameraDistance" value="2">
 <br><br>
 <div id="radioButtons">
+	<input type="radio" name="position" value="Right-Top-Front" checked="checked">Right Top Front<br>
+	<input type="radio" name="position" value="Right-Bottom-Back">Right Bottom Back<br>
+	<input type="radio" name="position" value="Right-Bottom-Front">Right Bottom Front<br>
+	<input type="radio" name="position" value="Right-Top-Back">Right Top Back<br>
 	<input type="radio" name="position" value="Left-Bottom-Back">Left Bottom Back<br>
 	<input type="radio" name="position" value="Left-Bottom-Front">Left Bottom Front<br>
 	<input type="radio" name="position" value="Left-Top-Back">Left Top Back<br>
 	<input type="radio" name="position" value="Left-Top-Front">Left Top Front<br>
-	<input type="radio" name="position" value="Right-Bottom-Back">Right Bottom Back<br>
-	<input type="radio" name="position" value="Right-Bottom-Front">Right Bottom Front<br>
-	<input type="radio" name="position" value="Right-Top-Back">Right Top Back<br>
-	<input type="radio" name="position" value="Right-Top-Front" checked="checked">Right Top Front<br>
 </div>
 <button onClick="redraw()">Redraw scene</button>
 <!-- ΒΗΜΑ.5. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΕΝΑ ΤΕΧΤ ΒΟΧ ΓΙΑ ΤΟ ΒΗΜΑ ΤΟΥ ΥΨΟΥΣ ΤΗΣ ΚΑΜΕΡΑΣ (ΠΡΟΤΕΙΝΟΜΕΝΟ VALUE 0.01)--->
