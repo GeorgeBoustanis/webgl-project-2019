@@ -192,54 +192,23 @@ function setupBuffers() {
 
 function redraw() {
 	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
-	var cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
-	var cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
-	
-	var selectPos = document.querySelector('input[name="position"]:checked').value;
-	var tokens = selectPos.split("-");
+	var cameraView = 90*Math.PI/180;
+	var cameraDistance = 2;
+	var tokens;
 	
 	var fx = fy = fz = 1;
 	
-	if(tokens[0] == "Left")  fx = -1;
-	if(tokens[1] == "Bottom")  fy = -1;
-	if(tokens[2] == "Back")	fz = -1;
-	
-	// Αποφυγή overflow για το totalAngle
-	/*if (totalAngle >= 2*Math.PI) // Αν η συνολική γωνία μόλις έγινε (σε ακτίνια) μεγαλύτερη από 360 μοίρες (2π) 
-		totalAngle = totalAngle - 2*Math.PI; // κάν'την ίση με την ίδια που είναι μικρότερη από 360 μοίρες 
-	else if (totalAngle < 0) // αλλιώς αν η συνολική γωνία μόλις έγινε αρνητική
-		totalAngle = totalAngle + 2*Math.PI; // κάν'την ίση με την ίδια (σε ακτίνια) που είναι θετική
-		*/ 
-
-	// ΒΗΜΑ.6. ΠΡΟΣΘΕΣΤΕ ΤΙΣ ΕΝΤΟΛΕΣ ΓΙΑ ΝΑ "ΨΑΡΕΨΕΤΕ" ΤΗΝ ΤΙΜΗ ΤΟΥ ΒΗΜΑΤΟΣ ΚΑΤΑ Ζ ΤΗΣ ΚΑΜΕΡΑΣ ΑΠΟ ΤΟ ΑΝΤΙΣΤΟΙΧΟ TEXTBOX ΚΑΙ ΝΑ ΥΠΟΛΟΓΙΣΕΤΕ ΤΟ ΣΥΝΟΛΙΚΟ Ζ 
-	// (ΠΑΡΟΜΟΙΑ ΜΕ ΤΟΝ ΥΠΟΛΟΓΙΣΜΟ ΤΟΥ totalAngle ΑΚΡΙΒΩΣ ΠΑΡΑΠΑΝΩ ΧΩΡΙΣ ΒΕΒΑΙΑ ΤΗ ΜΕΤΑΤΡΟΠΗ ΣΕ ΑΚΤΙΝΙΑ)
-
-	// Αρχή δημιουργίας πίνακα κάμερας/προοπτικής και ταΐσματος στο νέο uniform 
-	
-	//  ΒΗΜΑ.0.5 Δημιουργείται ένας (προς το παρόν) μοναδιαίος πίνακας για να "ταϊστεί" στοιχειωδώς το νέο uniform
-	
-	//	ΒΗΜΑ.7. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΤΙΣ ΑΠΑΡΑΙΤΗΤΕΣ ΕΝΤΟΛΕΣ ΩΣΤΕ:
-		/*	ΒΗΜΑ.7.1. ΝΑ ΔΗΜΙΟΥΡΓΗΘΕΙ Ο ΠΙΝΑΚΑΣ viewMatrix (View Matrix) ΚΑΙ ΝΑ ΠΕΡΙΕΧΕΙ ΤΟ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟ ΓΙΑ ΤΗ ΤΟΠΟΘΕΤΗΣΗ ΤΗΣ ΚΑΜΕΡΑΣ: 
-				- (Α) ΓΙΑ ΤΗ ΘΕΣΗ ΝΑ ΛΑΒΕΤΕ ΥΠ'ΟΨΗ ΤΙΣ ΤΙΜΕΣ ΤΩΝ GLOBAL ΜΕΤΑΒΛΗΤΩΝ ΓΙΑ ΤΗ ΓΩΝΙΑ ΚΑΙ ΤΟ ΥΨΟΣ 
-					-- ΤΟ totalAngle ΑΛΛΑΞΕ ΡΟΛΟ, ΤΩΡΑ ΕΠΗΡΕΑΖΕΙ ΤΗ ΘΕΣΗ ΤΗΣ ΚΑΜΕΡΑΣ ΩΣ ΠΡΟΣ x,y Ή, ΑΛΛΙΩΣ,
-						ΤΗ ΓΩΝΙΑ ΠΕΡΙΣΤΡΟΦΗΣ ΤΗΣ ΚΑΜΕΡΑΣ ΓΥΡΩ ΑΠΟ ΤΟΝ ΑΞΟΝΑ z. 
-						Δηλαδή, το x της κάμερας θα είναι r*cos(totalAngle) και το y της κάμερας θα είναι r*sin(totalAngle), όπου r η ακτίνα περιστροφής που θέλουμε (π.χ. χρησιμοποιήστε r=5 για ακτίνα αρκετά μεγαλύτερη από το "πάτωμα").
-						ΧΡΗΣΙΜΟΠΟΙΕΙΣΤΕ ΤΗΝ ΚΛΑΣΗ/ΒΙΒΛΙΟΘΗΚΗ Math ΤΗΣ Javascript για τα cos και sin	
-				- (Β) ΓΙΑ ΤΗΝ ΚΑΤΕΥΘΥΝΣΗ ΠΑΡΑΤΗΡΗΣΗΣ, Η ΚΑΜΕΡΑ "ΚΟΙΤΑΖΕΙ" ΠΡΟΣ ΤΗΝ ΑΡΧΗ ΤΩΝ ΑΞΟΝΩΝ
-				- (Γ) ΓΙΑ ΤΟΝ ΑΝΩ ΠΡΟΣΑΝΑΤΟΛΙΣΜΟ, ΤΟ ΠΑΝΩ ΜΕΡΟΣ ΤΗΣ ΕΙΝΑΙ ΠΡΟΣ ΤΗ ΘΕΤΙΚΗ ΦΟΡΑ ΤΟΥ z */
 		
-		
-		/*	ΒΗΜΑ.7.2. ΝΑ ΔΗΜΙΟΥΡΓΗΘΕΙ Ο ΠΙΝΑΚΑΣ perspectiveMatrix (Perspective Matrix) ΚΑΙ ΝΑ ΠΕΡΙΕΧΕΙ ΤΟ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟ ΓΙΑ ΤΗΝ ΠΡΟΟΠΤΙΚΗ: 
-				ΔΕΙΤΕ ΤΙΣ ΤΙΜΕΣ ΠΟΥ (ΘΑ) ΕΙΝΑΙ ΓΡΑΜΜΕΝΕΣ ΣΤΟΝ ΠΙΝΑΚΑ ΣΤΟ ΕΡΓΑΣΤΗΡΙΟ! */
-		
-		
-		/*	ΒΗΜΑ.7.3. ΥΠΟΛΟΓΙΣΤΕ ΤΟ ΓΙΝΟΜΕΝΟ ΤΟΥΣ ΚΑΙ ΑΠΟΘΗΚΕΥΣΤΕ ΤΟ ΣΤΟN pvMatrix 
-		- ΤΟ ΟΝΟΜΑ ΥΠΟΝΟΕΙ ΚΑΙ ΤΗ ΣΕΙΡΑ ΣΤΟΝ ΠΟΛΛΑΠΛΑΣΙΑΣΜΟ  */ 	
-		
-		
-	// ΒΗΜΑ.0.6 Ταΐζεται ο (προς το παρόν μοναδιαίος) πίνακας κάμερας/προοπτικής στο νέο uniform
-	// (μετά την ολοκλήρωση του ΒΗΜΑΤΟΣ.7 ο πίνακας θα περιέχει σε κάθε εκτέλεση της redraw τη νέα θέση της 
-	// κάμερας και την αντίστοιχη προοπτική)
+	if(start > 1){
+		tokens = (document.querySelector('input[name="position"]:checked').value).split("-");
+		if(tokens[0] == "Left")  fx = -1;
+		if(tokens[1] == "Bottom")  fy = -1;
+		if(tokens[2] == "Back")	fz = -1;
+		cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
+		perspDistHigh = cameraDistance * 10;
+		perspDistLow = 0.001;
+		cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
+	}
 	
 	var pvMatrix = mat4.create();
 
@@ -249,12 +218,7 @@ function redraw() {
 
 	var pMatrix = mat4.create();
 	
-	if(start > 1){
-		perspDistHigh = cameraDistance * 10;
-		perspDistLow = 0.001;
-	}
-	
-	mat4.perspective(pMatrix,Math.PI/2,1,perspDistLow,perspDistHigh);
+	mat4.perspective(pMatrix,cameraView,1,perspDistLow,perspDistHigh);
 
 	mat4.multiply(pvMatrix,pMatrix,vMatrix);
 
@@ -307,7 +271,6 @@ function startup() {
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); 	
 	redraw(); 
 }
-
 
 </script>
 
