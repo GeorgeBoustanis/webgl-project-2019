@@ -3,60 +3,64 @@
 <head>
 <script src="webgl-debug.js"></script>
 <script src="gl-matrix-min.js"></script>
+
+//source κωδικας του vertex shader
 <script id="vShader" type="x-shader/x-vertex">
-// Ο παρακάτω κώδικας δεν είναι Javascript αλλά GLSL (GL Shader Language)
-	attribute vec4 aVertexPosition; // attribute: παράμετρος εισόδου του shader
+	//attributes για θεση κορυφων και χρωματος κορυφων
+	attribute vec4 aVertexPosition;
 	attribute vec4 aVertexColor;
 	
+	//uniforms που θα φυλλαξουν τους πινακες μετ/σμου θεσης και καμερας/προοπτικης 
 	uniform mat4 uTransformMatrix; 
-	
-	// BHMA 0.1 Ένα νέο έξτρα uniform που θα υποδεχθεί τον πίνακα μετασχηματισμού προοπτικής/κάμερας (Perspective/View)
 	uniform mat4 uPerspectiveViewMatrix;	
 	
-	varying vec4 vColor; // varying: μεταβλητή εξόδου προς το fragment shader
+	varying vec4 vColor;
 	
-	void main() {
-		// ΒΗΜΑ 0.2 Το νέο uniform uPerspectiveViewMatrix συμμετέχει στον πολλαπλασιασμό για τη θέση της κάθε κορυφής 
-		// (μετά από πιθανές μετακινήσεις κλπ. που περιέχονται στο uniform uTransformMatrix)
+	//main συναρτηση του vertex shader
+	void main(){
 		gl_Position = uPerspectiveViewMatrix * uTransformMatrix * aVertexPosition; 
-		
-		vColor = aVertexColor;  // Χρώμα κάθε κορυφής (vertex) 
+		vColor = aVertexColor;
 	} 
 </script>
+
+//source κωδικας του fragment shader
 <script id="fShader" type="x-shader/x-fragment">
-	precision mediump float; 
-	varying vec4 vColor; 
+	precision mediump float;
+	varying vec4 vColor;
+	
+	//main συναρτηση του fragment shader
 	void main() {
 		gl_FragColor = vColor;
 	}
 </script>
+
+//κυριως script σε javascript
 <script>
 var gl; 
 var canvas; 
 var shaderProgram; 
 var vertexBuffer; 
 var colorBuffer; 
-var vertexPositionAttributePointer; // Η διεύθυνση του attribute aVertexPosition
-var vertexColorAttributePointer; // Η διεύθυνση του attribute aVertexColor
+var vertexPositionAttributePointer; //pointer που δειχνει στο attribute "aVertexPosition"
+var vertexColorAttributePointer; //pointer που δειχνει στο attribute "aVertexColor"
 var indexBuffer;
+
+//η μεταβλητη start που ακολουθει, θα χρησιμοποιηθει ετσι ωστε καθε φορα που θα γινεται ανανεωση στη σελιδα
+//να φορτωνονται οι default τιμες για προοπτικη και καμερα χωρις να λαμβανονται υπ'οψιν
+//οι τιμες που "ξεμειναν" στα αντιστοιχα html textboxes, πριν την ανανεωση
 var start = 0;
-var perspDistHigh = 10; //αν εκτελεστει η redraw πανω απο μια φορες τοτε το perspDist θα γινει cameraDistance * 10
-var perspDistLow = 0.01;
 
-// ΒΗΜΑ.1. Προσθέστε τρεις νέους buffers: (α) για τις κορυφές του πατώματος, (β) για τα χρώματα των κορυφών του πατώματος και (γ) για τους indices των κορυφών του πατώματος
-// Προτεινόμενα ονόματα: floorVBuffer, floorCBuffer, floorIBuffer
+//default τιμες για καμερα και προοπτικη
+var cameraView = 90*Math.PI/180; //γωνια θεασης
+var cameraDistance = 2; //ορθογωνια αποσταση καμερας
+var perspDistHigh = 10; //μακρινο κατωφλι ορατοτητας
+var perspDistLow = 0.01; //κοντινο κατωφλι ορατοτητας
 
-var totalAngle=0; 
+var transformUniformPointer; //pointer που δειχνει στο uniform "uTransformMatrix"
 
-var transformUniformPointer;
+var perspectiveViewUniformPointer; //pointer που δειχνει στο uniform "uPerspectiveViewMatrix"
 
-// BHMA 0.3. Έχει δηλωθεί μία νέα global μεταβλητή για την αποθήκευση της διεύθυνσης του νέου uniform 
-var perspectiveViewUniformPointer;
-
-// ΒΗΜΑ.4. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΤΗ ΔΗΛΩΣΗ ΜΙΑΣ GLOBAL ΜΕΤΑΒΛΗΤΗΣ totalZ ΓΙΑ ΤΟ ΣΥΝΟΛΙΚΟ ΥΨΟΣ z ΤΗΣ ΚΑΜΕΡΑΣ ΚΑΙ ΑΡΧΙΚΟΠΟΙΗΣΤΕ ΤΗ ΣΕ 0.25
-var totalZ = 0.25;
-
-var requestId=0; 
+//ΑΚΟΛΟΥΘΟΥΝ ΟΙ FUNCTIONS ΠΟΥ ΘΑ ΧΡΗΣΙΜΟΠΟΙΗΘΟΥΝ ΣΤΟ SCRIPT
   
 function createGLContext(canvas) {
 	var context = null;
@@ -193,9 +197,6 @@ function setupBuffers() {
 function redraw() {
 	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
 	
-	
-	var cameraView = 90*Math.PI/180;
-	var cameraDistance = 2;
 	var tokens;
 	
 	var fx = fy = fz = 1;
