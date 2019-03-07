@@ -119,16 +119,12 @@ function setupShaders() {
 	
 	transformUniformPointer = gl.getUniformLocation(shaderProgram, "uTransformMatrix"); 
 	
-	// BHMA.0.4 Αποθηκεύεται στο σχετικό pointer η διεύθυνση του νέου uniform uPerspectiveViewMatrix
 	perspectiveViewUniformPointer = gl.getUniformLocation(shaderProgram, "uPerspectiveViewMatrix");
 }
 
 function setupBuffers() {
-
-// Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των κορυφών της κεντρικής πυραμίδας (οι άλλες προκύπτουν με μετασχηματισμούς μετακίνησης)
-
-	//οι κορυφες των τριγωνων ΓΙΑ ΤΟΝ ΚΥΒΟ ΠΛΕΟΝ	
 	
+	//ακολουθουν εντολες για τροφοδοτηση των κορυφων του κυβου στον vertexBuffer
 	vertexBuffer = gl.createBuffer(); 
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); 
 	var triangleVertices = [
@@ -147,9 +143,9 @@ function setupBuffers() {
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleVertices),	gl.STATIC_DRAW);
 	vertexBuffer.itemSize = 4; 
 	vertexBuffer.numberOfItems = 8; 
-// Τέλος δημιουργίας/ενημέρωσης buffer κορυφών κεντρικής πυραμίδας
 
-// Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των ΧΡΩΜΑΤΩΝ των κορυφών της κεντρικής πυραμίδας
+
+	//ακολουθουν εντολες για τροφοδοτηση των χρωματων των κορυφων του κυβου στον colorBuffer
 	colorBuffer=gl.createBuffer(); 
 	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 	var colorVertices = [0.329, 0.537, 0.713, 1.0,
@@ -164,11 +160,15 @@ function setupBuffers() {
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colorVertices),	gl.STATIC_DRAW);
 	colorBuffer.itemSize=4;
 	colorBuffer.numberOfItems=8;
-// Τέλος δημιουργίας/ενημέρωσης buffer ΧΡΩΜΑΤΩΝ των κορυφών κεντρικής πυραμίδας
+	
 
-// Έναρξη δημιουργίας και ενημέρωσης ("ταΐσματος") του buffer των ΔΕΙΚΤΩΝ (indices) των κορυφών της κεντρικής πυραμίδας	
+	//ακολουθουν εντολες για τροφοδοτηση των δεικτων των κορυφων του κυβου στον indexBuffer	
 	indexBuffer = gl.createBuffer(); 
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
+	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);
+	
+	//καθε εδρα του κυβου φτιαχνεται απο 2 τριγωνα, καθε κυβος εχει 6 εδρες οποτε 6*2=12 τριγωνα
+	//και καθε τριγωνο εχει 3 κορυφες, οποτε 12*3=36 κορυφες θα δηλωθουν συνολικα στον indexMatrix
+	 
 	var indexMatrix = [
 						0,1,2,
 						0,3,2,
@@ -185,11 +185,7 @@ function setupBuffers() {
 						];
 	gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexMatrix),gl.STATIC_DRAW);   
 	indexBuffer.itemSize=1; 
-	indexBuffer.numberOfItems = 36;  
-// Τέλος δημιουργίας/ενημέρωσης buffer ΔΕΙΚΤΩΝ (indices) των κορυφών κεντρικής πυραμίδας
-		
-// ΒΗΜΑ.2. Χρησιμοποιώντας τα 3 παραπάνω πακέτα εντολών σαν παράδειγμα, δημιουργείστε και "ταΐστε" εδώ τους 3 νέους buffers που αφορούν το πάτωμα
-// Θεωρείστε και τοποθετείστε το πάτωμα παράλληλο στο επίπεδο xy και στο κέντρο του, με διαστάσεις 2x2 και με z=-0.2
+	indexBuffer.numberOfItems = 36;
 }
 
 
@@ -197,16 +193,22 @@ function setupBuffers() {
 function redraw() {
 	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
 	
+	//local μεταβλητη στην οποια θα φυλαχθει η επιλογη απο το html radio button ΣΕ ΜΟΡΦΗ TOKENS
 	var tokens;
 	
+	//οι παρακατω μεταβλητες (fx εκ του xfactor, fy εκ του yfactor, fz εκ του zfactor) θα χρησιμοποιηθουν
+	//για την τοποθετηση της καμερας, αναλογα με την επιλογη του χρηστη απο τα html radio buttons
+	//και αρχικοποιουνται με την τιμη 1 
 	var fx = fy = fz = 1;
 	
-		
+	//αν η σελιδα δεν εχει ανανεωθει (αν ανανεωθηκε τοτε start == 1) τοτε "λαβε υπ'οψιν σου τις επιλογες του χρηστη"
 	if(start > 1){
 		tokens = (document.querySelector('input[name="position"]:checked').value).split("-");
+		
 		if(tokens[0] == "Left")  fx = -1;
 		if(tokens[1] == "Bottom")  fy = -1;
 		if(tokens[2] == "Back")	fz = -1;
+		
 		cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
 		perspDistHigh = cameraDistance * 10;
 		perspDistLow = 0.001;
@@ -248,7 +250,7 @@ function redraw() {
 	//"ενεργοποιηση" του buffer με τους δεικτες κορυφων (indexBuffer)
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
 
-	//προς το παρον ο πινακας μετ/σμου (uniform) που υπαρχει στον vertex shader
+	//προς το παρον ο πινακας μετ/σμου θεσης (uniform) που υπαρχει στον vertex shader
 	//θα γεμιστει με τον μοναδιαιο πινακα ετσι ωστε να μην εκτελεστει στον κυβο καποιος
 	//επιπλεον μετασχηματισμος περαν του μετ/μου καμερας/προοπτικης
 	var temp=mat4.create();
