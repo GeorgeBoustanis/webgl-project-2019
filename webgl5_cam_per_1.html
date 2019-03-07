@@ -192,6 +192,8 @@ function setupBuffers() {
 
 function redraw() {
 	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
+	
+	
 	var cameraView = 90*Math.PI/180;
 	var cameraDistance = 2;
 	var tokens;
@@ -210,50 +212,48 @@ function redraw() {
 		cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
 	}
 	
-	var pvMatrix = mat4.create();
-
+	//πινακας μετ/μου καμερας-view
 	var vMatrix = mat4.create();
-	
+	//"γεμισμα" του πινακα μετ/σμου καμερας-view
 	mat4.lookAt(vMatrix,[fx*cameraDistance,fy*cameraDistance,fz*cameraDistance],[0,0,0],[0,1,0]);
-
-	var pMatrix = mat4.create();
 	
+	//πινακας μετ/μου προοπτικης-perspective
+	var pMatrix = mat4.create();
+	//"γεμισμα" πινακα μετ/σμου προοπτικης-perspective
 	mat4.perspective(pMatrix,cameraView,1,perspDistLow,perspDistHigh);
-
+	
+	//γινομενο perspective * view	
+	var pvMatrix = mat4.create();
+	
+	//εκτελειται ο πολ/σμος πινακων καμερας και προοπτικης
+	//το γινομενο καταληγει στον pvMatrix
 	mat4.multiply(pvMatrix,pMatrix,vMatrix);
-
+	
+	//τροφοδοτω το uniform καμερας/προοπτικης μεσω pointer, με τον πινακα γινομενου "καμερα επι προοπτικη"
 	gl.uniformMatrix4fv(perspectiveViewUniformPointer, false, new Float32Array(pvMatrix));
-// Τέλος δημιουργίας πίνακα και ταΐσματος στο uniform θέσης κάμερας/προοπτικής
 		
 	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-	// ΑΡΧΗ 1ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΑΡΧΗ ΕΝΕΡΓΟΠΟΙΗΣΗΣ ΚΑΙ ΑΝΤΙΣΤΟΙΧΙΣΗΣ ΤΩΝ ATTRIBUTES ΤΟΥ VERTEX SHADER ME ΤΟΥΣ ΚΑΤΑΛΛΗΛΟΥΣ BUFFERS	
+	//τροφοδοτω το attribute aVertexPosition (vertex shader) μεσω pointer
+	//με τα περιεχομενα του buffer κορυφων (vertexBuffer)
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.vertexAttribPointer(vertexPositionAttributePointer, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	
+	//τροφοδοτω το attribute aVertexColor (vertex shader) μεσω pointer
+	//με τα περιεχομενα του buffer χρωματων (colorBuffer)
 	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 	gl.vertexAttribPointer(vertexColorAttributePointer, colorBuffer.itemSize, gl.FLOAT, false, 0, 0); 
 	
+	//"ενεργοποιηση" του buffer με τους δεικτες κορυφων (indexBuffer)
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
-	// ΤΕΛΟΣ 1ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΤΕΛΟΣ ΕΝΕΡΓΟΠΟΙΗΣΗΣ ΚΑΙ ΑΝΤΙΣΤΟΙΧΙΣΗΣ ΤΩΝ ATTRIBUTES ΤΟΥ VERTEX SHADER ΜΕ ΤΟΥΣ ΚΑΤΑΛΛΗΛΟΥΣ BUFFERS ΤΗΣ ΠΥΡΑΜΙΔΑΣ
 
-	
-		var temp=mat4.create();
+	//προς το παρον ο πινακας μετ/σμου (uniform) που υπαρχει στον vertex shader
+	//θα γεμιστει με τον μοναδιαιο πινακα ετσι ωστε να μην εκτελεστει στον κυβο καποιος
+	//επιπλεον μετασχηματισμος περαν του μετ/μου καμερας/προοπτικης
+	var temp=mat4.create();
 		
-		gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
-		gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
-		// ΤΕΛΟΣ 2ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ: ΤΕΛΟΣ ΔΗΜΙΟΥΡΓΙΑΣ/ΕΝΗΜΕΡΩΣΗΣ ΠΙΝΑΚΑ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ, TAΪΣΜΑΤΟΣ ΣΤΟ ΑΝΤΙΣΤΟΙΧΟ uniform ΚΑΙ ΣΧΕΔΙΑΣΗΣ
-		
-	
-	// ΒΗΜΑ.3. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΤΟΝ ΚΩΔΙΚΑ ΓΙΑ ΝΑ ΕΝΕΡΓΟΠΟΙΗΘΟΥΝ ΟΙ BUFFERS ΤΟΥ "ΠΑΤΩΜΑΤΟΣ" ΚΑΙ ΝΑ ΣΧΕΔΙΑΣΤΕΙ ΤΟ ΠΑΤΩΜΑ
-	//  ΒΗΜΑ 3.1 ΔΕΙΤΕ ΤΟΝ ΚΩΔΙΚΑ "ΑΡΧΗ-ΤΕΛΟΣ 1ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ" ΓΙΑ ΕΝΕΡΓΟΠΟΙΗΣΗ ΚΑΙ ΑΝΤΙΣΤΟΙΧΙΣΗ ΤΩΝ ATTRIBUTES ΤΟΥ VERTEX SHADER ME ΤΟΥΣ ΚΑΤΑΛΛΗΛΟΥΣ BUFFERS ΤΗΣ ΠΥΡΑΜΙΔΑΣ" ΠΑΡΑΠΑΝΩ 
-	
-	
-	// 	ΒΗΜΑ 3.2 ΚΑΙ ΤΟΝ ΚΩΔΙΚΑ "ΑΡΧΗ-ΤΕΛΟΣ 2ων ΕΡΓΑΣΙΩΝ ΠΥΡΑΜΙΔΑΣ" ΓΙΑ ΔΗΜΙΟΥΡΓΙΑ/ΕΝΗΜΕΡΩΣΗ ΠΙΝΑΚΑ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ, ΤΑΪΣΜΑ ΣΤΟ ΑΝΤΙΣΤΟΙΧΟ uniform ΚΑΙ ΣΧΕΔΙΑΣΗ"
-	//  ΔΕ ΘΑ ΧΡΕΙΑΣΤΕΙ for ΓΙΑ ΤΟ ΠΑΤΩΜΑ, ΟΥΤΕ ΚΑΠΟΙΑ ΜΕΤΑΚΙΝΗΣΗ: Ο ΠΙΝΑΚΑΣ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ ΘΑ ΕΙΝΑΙ ΜΟΝΑΔΙΑΙΟΣ
-	//  ΟΜΩΣ ΧΡΕΙΑΖΕΤΑΙ ΠΙΝΑΚΑΣ ΜΕΤΑΣΧΗΜΑΤΙΣΜΟΥ (ΜΕΤΑΚΙΝΗΣΗΣ κλπ.), ΠΑΡΟΤΙ ΘΑ ΕΙΝΑΙ ΜΟΝΑΔΙΑΙΟΣ,
-	// ΓΙΑΤΙ ΤΟΝ ΕΧΟΥΜΕ "ΤΑΞΕΙ" ΣΤΟ VERTEX SHADER ΩΣ UNIFORM (ΤΟ uTransformMatrix) ΠΟΥ ΠΕΡΙΜΕΝΕΙ "ΤΑΪΣΜΑ"..
-	
+	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
+	gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
 }
 
 function startup() {
