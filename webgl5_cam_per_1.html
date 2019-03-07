@@ -4,7 +4,7 @@
 <script src="webgl-debug.js"></script>
 <script src="gl-matrix-min.js"></script>
 
-//source κωδικας του vertex shader
+<!--source κωδικας του vertex shader -->
 <script id="vShader" type="x-shader/x-vertex">
 	//attributes για θεση κορυφων και χρωματος κορυφων
 	attribute vec4 aVertexPosition;
@@ -23,7 +23,7 @@
 	} 
 </script>
 
-//source κωδικας του fragment shader
+<!--source κωδικας του fragment shader -->
 <script id="fShader" type="x-shader/x-fragment">
 	precision mediump float;
 	varying vec4 vColor;
@@ -34,7 +34,7 @@
 	}
 </script>
 
-//κυριως script σε javascript
+<!--κυριως script σε javascript -->
 <script>
 var gl; 
 var canvas; 
@@ -299,15 +299,5 @@ camera distance:<input type="text" id="cameraDistance" value="2">
 	<input type="radio" name="position" value="Left-Top-Front">Left Top Front<br>
 </div>
 <button onClick="redraw()">Redraw scene</button>
-<!-- ΒΗΜΑ.5. ΠΡΟΣΘΕΣΤΕ ΕΔΩ ΕΝΑ ΤΕΧΤ ΒΟΧ ΓΙΑ ΤΟ ΒΗΜΑ ΤΟΥ ΥΨΟΥΣ ΤΗΣ ΚΑΜΕΡΑΣ (ΠΡΟΤΕΙΝΟΜΕΝΟ VALUE 0.01)--->
 </body>
 </html>
-<!--
-ΧΡΗΣΗ ΠΟΛΛΩΝ BUFFERS ΓΙΑ ΣΧΕΔΙΑΣΗ 
-Στόχος αυτής της άσκησης είναι η σχεδίαση ενός "πατώματος" κάτω από τις πυραμίδες (παράλληλο στο επίπεδο xy, με διαστάσεις 2x2 και με z=-0.2)... 
-
-ΤΟΠΟΘΕΤΗΣΗ "ΚΑΜΕΡΑΣ"
-... και προβολή της σκηνής από διαφορετικά σημεία παρατήρησης μέσω ενός αντίστοιχου μετασχηματισμού για τη θέση της κάμερας
-
-ΑΚΟΛΟΥΘΕΙΣΤΕ ΤΑ ΒΗΜΑ.ΤΑ ΠΟΥ ΕΜΦΑΝΙΖΟΝΤΑΙ ΣΑΝ ΑΡΙΘΜΗΜΕΝΑ ΣΧΟΛΙΑ ΣΤΟΝ ΚΩΔΙΚΑ, ΣΥΜΠΛΗΡΩΝΟΝΤΑΣ ΤΙΣ ΑΝΤΙΣΤΟΙΧΕΣ ΕΝΤΟΛΕΣ ΜΕ ΤΗ ΣΕΙΡΑ ΤΗΣ ΑΡΙΘΜΗΣΗΣ
--->
