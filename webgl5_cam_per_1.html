@@ -56,8 +56,8 @@ var start = 0;
 
 //default τιμες για καμερα και προοπτικη
 var cameraView = 90*Math.PI/180; //γωνια θεασης
-var cameraDistance = 2; //ορθογωνια αποσταση καμερας
-var perspDistHigh = 10; //μακρινο κατωφλι ορατοτητας
+var cameraDistance = 10; //ορθογωνια αποσταση καμερας
+var perspDistHigh = 100; //μακρινο κατωφλι ορατοτητας
 var perspDistLow = 0.01; //κοντινο κατωφλι ορατοτητας
 
 var transformUniformPointer; //pointer που δειχνει στο uniform "uTransformMatrix"
@@ -180,7 +180,7 @@ function setupBuffers() {
 	blueColorBuffer=gl.createBuffer(); 
 	gl.bindBuffer(gl.ARRAY_BUFFER, blueColorBuffer);
 	
-	//η μεταβλητη colorVerices θα χρησιμοποιηθει ως βοηθητικη μεταβλητη για να τροφοδοτησουμε
+	//η μεταβλητη colorVertices θα χρησιμοποιηθει ως βοηθητικη μεταβλητη για να τροφοδοτησουμε
 	//με χρωματα τους δυο buffers χρωματος (blueColorBuffer και redColorBuffer)
 	
 	//αρχιζουμε με τις μπλε αποχρωσεις που θα τις δωσουμε στον blueColorBuffer
@@ -313,6 +313,9 @@ function setupBuffers() {
 
 
 function redraw() {
+	var scaleMat = mat4.create();
+	var tranMat = mat4.create();
+
 	start++; //αν εκτελεστει η redraw αυξανεται ο μετρητης start
 	
 	//local μεταβλητη στην οποια θα φυλαχθει η επιλογη απο το html radio button ΣΕ ΜΟΡΦΗ TOKENS
@@ -326,18 +329,64 @@ function redraw() {
 	//αν η σελιδα δεν εχει ανανεωθει (αν ανανεωθηκε τοτε start == 1) τοτε "λαβε υπ'οψιν σου τις επιλογες του χρηστη"
 	if(start > 1){
 		tokens = (document.querySelector('input[name="position"]:checked').value).split("-");
-		
 		if(tokens[0] == "Left")  fx = -1;
 		if(tokens[1] == "Bottom")  fy = -1;
 		if(tokens[2] == "Back")	fz = -1;
-		
 		cameraDistance = parseFloat(document.getElementById("cameraDistance").value);
 		perspDistHigh = cameraDistance * 10;
 		perspDistLow = 0.001;
 		cameraView = parseFloat(document.getElementById("cameraView").value) * Math.PI/180.0;
 	}
 	
-	//πινακας μετ/μου καμερας-view
+	cameraPerspSetup(fx,fy,fz)
+		
+	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+	TODO:
+	//κορμος/σωμα
+	scaleMat = mat4.fromScaling(scaleMat,[10,12,6]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, blueColorBuffer);
+	
+	//δεξι χερι
+	tranMat = mat4.fromTranslation(tranMat,[6,1,0]);
+	scaleMat = mat4.fromScaling(scaleMat,[2,10,3]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, redColorBuffer);
+
+	//αριστερο χερι
+	tranMat = mat4.fromTranslation(tranMat,[-6,1,0]);
+	scaleMat = mat4.fromScaling(scaleMat,[2,10,3]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, redColorBuffer);
+
+	//κεφαλι
+	tranMat = mat4.fromTranslation(tranMat,[0,8.5,0]);
+	scaleMat = mat4.fromScaling(scaleMat,[6,5,4]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, redColorBuffer);
+
+	//αριστερο ποδι
+	tranMat = mat4.fromTranslation(tranMat,[-3,-11,0]);
+	scaleMat = mat4.fromScaling(scaleMat,[4,10,3]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, redColorBuffer);
+
+	//δεξι ποδι
+	tranMat = mat4.fromTranslation(tranMat,[3,-11,0]);
+	scaleMat = mat4.fromScaling(scaleMat,[4,10,3]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, redColorBuffer);
+
+	//αριστερη πατουσα
+	tranMat = mat4.fromTranslation(tranMat,[-3,-17,1.5]);
+	scaleMat = mat4.fromScaling(scaleMat,[4,2,6]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, blueColorBuffer);
+
+	//δεξια πατουσα
+	tranMat = mat4.fromTranslation(tranMat,[3,-17,1.5]);
+	scaleMat = mat4.fromScaling(scaleMat,[4,2,6]);
+	drawPart(scaleMat, tranMat, vertexBuffer, indexBuffer, blueColorBuffer);
+}
+
+TODO:
+//δοκιμη μιας function για "σεταρισμα" προοπτικης/καμερας
+function cameraPerspSetup(fx,fy,fz,center){
+    //πινακας μετ/μου καμερας-view
 	var vMatrix = mat4.create();
 	//"γεμισμα" του πινακα μετ/σμου καμερας-view
 	mat4.lookAt(vMatrix,[fx*cameraDistance,fy*cameraDistance,fz*cameraDistance],[0,0,0],[0,1,0]);
@@ -356,18 +405,20 @@ function redraw() {
 	
 	//τροφοδοτω το uniform καμερας/προοπτικης μεσω pointer, με τον πινακα γινομενου "καμερα επι προοπτικη"
 	gl.uniformMatrix4fv(perspectiveViewUniformPointer, false, new Float32Array(pvMatrix));
-		
-	gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+}
 
-	//τροφοδοτω το attribute aVertexPosition (vertex shader) μεσω pointer
+TODO:
+//δοκιμη της function drawPart για σχεδιαση ενος robot part
+function drawPart(scaling, translation, vertexBuffer, indexBuffer, colorBuffer){
+    //τροφοδοτω το attribute aVertexPosition (vertex shader) μεσω pointer
 	//με τα περιεχομενα του buffer κορυφων (vertexBuffer)
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 	gl.vertexAttribPointer(vertexPositionAttributePointer, vertexBuffer.itemSize, gl.FLOAT, false, 0, 0);
 	
 	//τροφοδοτω το attribute aVertexColor (vertex shader) μεσω pointer
 	//με τα περιεχομενα του buffer χρωματων (blueColorBuffer)
-	gl.bindBuffer(gl.ARRAY_BUFFER, blueColorBuffer);
-	gl.vertexAttribPointer(vertexColorAttributePointer, blueColorBuffer.itemSize, gl.FLOAT, false, 0, 0); 
+	gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+	gl.vertexAttribPointer(vertexColorAttributePointer, colorBuffer.itemSize, gl.FLOAT, false, 0, 0); 
 	
 	//"ενεργοποιηση" του buffer με τους δεικτες κορυφων (indexBuffer)
 	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer); 
@@ -375,26 +426,10 @@ function redraw() {
 	//προς το παρον ο πινακας μετ/σμου θεσης (uniform) που υπαρχει στον vertex shader
 	//θα γεμιστει με τον μοναδιαιο πινακα ετσι ωστε να μην εκτελεστει στον κυβο καποιος
 	//επιπλεον μετασχηματισμος περαν του μετ/μου καμερας/προοπτικης
-	var temp=mat4.create();
-		
-	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp)); 
-	gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
-	
-	//παρακατω εκτελουνται εργασιες ετσι ωστε να σχεδιαστει ο κοκκινος κυβος μετατοπισμενος κατα [0.5, 0.5, 0]
-	
-	//γεμιζω τον πινακα μετ/σμου θεσης με τον καταλληλο πινακα μετακινησης και αμεσως μετα τον τροφοδοτω
-	//στον vertex shader μεσω pointer
-	mat4.fromTranslation(temp,[1.0, 1.0, 0]);
-	gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(temp));
-	
-	//τροφοδοτω το aVertexColor με τις κοκκινες αποχρωσεις αυτη τη φορα που ειναι μεσα στον redColorBuffer
-	gl.bindBuffer(gl.ARRAY_BUFFER, redColorBuffer);
-	gl.vertexAttribPointer(vertexColorAttributePointer, redColorBuffer.itemSize, gl.FLOAT, false, 0, 0);
-	
-	//"ενεργοποιηση" του buffer με τους δεικτες κορυφων (indexBuffer)
-	gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);
-	
-	//σχεδιαση κοκκινου κυβου
+
+    var transScale = mat4.create();
+    mat4.multiply(transScale,translation,scaling);
+    gl.uniformMatrix4fv(transformUniformPointer, false, new Float32Array(transScale)); 
 	gl.drawElements(gl.TRIANGLES,indexBuffer.numberOfItems,gl.UNSIGNED_SHORT, 0);
 }
 
@@ -425,7 +460,7 @@ function startup() {
 <br>
 camera view (degrees):<input type="text" id="cameraView" value="90">
 <br>
-camera distance:<input type="text" id="cameraDistance" value="2">
+camera distance:<input type="text" id="cameraDistance" value="10">
 <br><br>
 <div id="radioButtons">
 	<input type="radio" name="position" value="Right-Top-Front" checked="checked">Right Top Front<br>
